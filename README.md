@@ -56,22 +56,9 @@ Available tags:
 - `main` - Latest build from main branch
 - `main-<sha>` - Specific commit from main branch
 
-### Building Locally
-
-To build the Moodle image locally (for customization or offline use):
-
-```bash
-# Edit compose.yml and uncomment the build section:
-services:
-  moodle:
-    # image: ghcr.io/netresearch/moodle-docker/moodle:latest
-    build:
-      context: ./docker/moodle
-      dockerfile: Dockerfile
-
-# Then build
-docker compose build
-```
+The `compose.yml` includes both `image:` and `build:` directives:
+- `docker compose up` - Pulls pre-built image (fast)
+- `docker compose build` - Builds locally (for customization)
 
 ## Prerequisites
 

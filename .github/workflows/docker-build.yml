@@ -174,14 +174,6 @@ jobs:
           sed -i 's/CHANGE_ME_SECURE_ROOT_PASSWORD_HERE/test_root_456/g' .env
           sed -i 's/CHANGE_ME_SECURE_VALKEY_PASSWORD_HERE/test_valkey_789/g' .env
 
-      - name: Configure for local build
-        run: |
-          # Use local build instead of pulling from GHCR for testing
-          sed -i 's|image: ghcr.io/netresearch/moodle-docker/moodle:latest|# image: ghcr.io/netresearch/moodle-docker/moodle:latest|' compose.yml
-          sed -i 's|# build:|build:|' compose.yml
-          sed -i 's|#   context: ./docker/moodle|  context: ./docker/moodle|' compose.yml
-          sed -i 's|#   dockerfile: Dockerfile|  dockerfile: Dockerfile|' compose.yml
-
       - name: Build and start services
         run: |
           docker compose build --no-cache
