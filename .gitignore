@@ -2,7 +2,7 @@
 .env
 
 # Moodle code (managed via git clone separately)
-moodle/
+/moodle/
 
 # Backups (if created locally)
 backups/
