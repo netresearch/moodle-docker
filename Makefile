@@ -35,7 +35,7 @@ clone-moodle: ## Clone Moodle repository (shallow clone, tip only)
 	@cd moodle && git branch
 	@echo "✅ Moodle cloned successfully"
 
-setup: ## Create .env file from template
+setup: ## Create .env file with random passwords
 	@if [ -f ".env" ]; then \
 		echo "⚠️  .env file already exists"; \
 		read -p "Overwrite? [y/N] " confirm; \
@@ -44,9 +44,16 @@ setup: ## Create .env file from template
 			exit 1; \
 		fi; \
 	fi
-	cp .env.example .env
-	@echo "⚠️  IMPORTANT: Edit .env and set secure passwords!"
-	@echo "   Required: DB_PASSWORD, DB_ROOT_PASSWORD, VALKEY_PASSWORD"
+	@echo "📝 Creating .env file with random passwords..."
+	@cp .env.example .env
+	@DB_PASS=$$(openssl rand -base64 32); \
+	DB_ROOT_PASS=$$(openssl rand -base64 32); \
+	VALKEY_PASS=$$(openssl rand -base64 32); \
+	sed -i "s|CHANGE_ME_SECURE_PASSWORD_HERE|$$DB_PASS|" .env; \
+	sed -i "s|CHANGE_ME_SECURE_ROOT_PASSWORD_HERE|$$DB_ROOT_PASS|" .env; \
+	sed -i "s|CHANGE_ME_SECURE_VALKEY_PASSWORD_HERE|$$VALKEY_PASS|" .env
+	@echo "✅ .env file created with secure random passwords"
+	@echo "   Review and customize: nano .env"
 
 start: ## Start all services (pulls pre-built image)
 	docker compose $(COMPOSE_FILES) up -d
@@ -128,6 +135,42 @@ clean-moodle: ## Remove Moodle clone directory
 pull: ## Pull latest pre-built image from GHCR
 	docker compose $(COMPOSE_FILES) pull moodle
 	@echo "✅ Latest image pulled"
+
+install: ## Run Moodle CLI installer
+	@if [ ! -f ".env" ]; then \
+		echo "❌ .env file not found. Run 'make setup' first."; \
+		exit 1; \
+	fi
+	@echo "🚀 Installing Moodle via CLI..."
+	@export $$(grep -v '^#' .env | xargs) && docker compose $(COMPOSE_FILES) exec -T moodle php admin/cli/install.php \
+		--lang=en \
+		--wwwroot=$${MOODLE_SITE_URL} \
+		--dataroot=/var/moodledata \
+		--dbtype=mariadb \
+		--dbhost=database \
+		--dbname=moodle \
+		--dbuser=moodleuser \
+		--dbpass=$${DB_PASSWORD} \
+		--prefix=mdl_ \
+		--fullname="Moodle LMS" \
+		--shortname="Moodle" \
+		--adminuser=admin \
+		--adminpass=Admin123! \
+		--adminemail=admin@example.com \
+		--non-interactive \
+		--agree-license
+	@echo ""
+	@echo "✅ Moodle installed successfully!"
+	@echo "   URL: http://localhost:8080"
+	@echo "   User: admin"
+	@echo "   Pass: Admin123!"
+	@echo ""
+	@echo "⚠️  IMPORTANT: Change the admin password immediately!"
+
+configure-cache: ## Configure Valkey for Moodle Universal Cache (MUC)
+	@echo "🔧 Configuring Valkey for application cache..."
+	docker compose $(COMPOSE_FILES) exec -T moodle php /var/www/scripts/configure-valkey-cache.php
+	@echo "✅ Valkey cache configured"
 
 upgrade-moodle: ## Upgrade Moodle code to latest in branch
 	@if [ ! -d "moodle" ]; then \

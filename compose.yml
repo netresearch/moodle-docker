@@ -23,6 +23,8 @@ services:
       - moodledata:/var/moodledata:rw
       # Custom Moodle configuration
       - ./config/moodle-config.php:/var/www/html/config.php:ro
+      # Scripts for automation
+      - ./scripts:/var/www/scripts:ro
     environment:
       # Database
       - DB_TYPE=${DB_TYPE:-mariadb}
@@ -109,7 +111,7 @@ services:
 
   # Ofelia Cron Scheduler
   ofelia:
-    image: mcuadros/ofelia:latest
+    image: ghcr.io/netresearch/ofelia:latest
     container_name: ${COMPOSE_PROJECT_NAME:-moodle45}_ofelia
     restart: unless-stopped
     networks:
@@ -117,7 +119,7 @@ services:
     volumes:
       # Docker socket for container orchestration
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    command: daemon --docker
+    command: daemon
     depends_on:
       - moodle
 
