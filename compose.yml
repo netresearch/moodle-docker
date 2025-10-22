@@ -6,9 +6,11 @@ version: '3.8'
 services:
   # Moodle Application (PHP 8.3 + Apache)
   moodle:
-    build:
-      context: ./docker/moodle
-      dockerfile: Dockerfile
+    image: ghcr.io/netresearch/moodle-docker/moodle:latest
+    # Uncomment to build locally instead of using pre-built image:
+    # build:
+    #   context: ./docker/moodle
+    #   dockerfile: Dockerfile
     container_name: ${COMPOSE_PROJECT_NAME:-moodle45}_moodle
     restart: unless-stopped
     networks:
