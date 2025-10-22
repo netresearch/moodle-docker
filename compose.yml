@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Moodle 4.5 Production Stack
 # Services: Moodle + MariaDB 11 + Valkey 9 + Ofelia (cron)
 
