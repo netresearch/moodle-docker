@@ -181,7 +181,7 @@ jobs:
 
       - name: Test database connection
         run: |
-          docker compose exec -T database mysql -uroot -ptest_root_456 -e "SHOW DATABASES;" | grep -q "moodle"
+          docker compose exec -T database mariadb -uroot -ptest_root_456 -e "SHOW DATABASES;" | grep -q "moodle"
           echo "✅ Database connection working"
 
       - name: Test Valkey connection
