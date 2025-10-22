@@ -46,7 +46,7 @@ jobs:
 
       - name: Check for leaked secrets
         run: |
-          if git ls-files | xargs grep -l "CHANGE_ME" | grep -v ".env.example"; then
+          if git ls-files | xargs grep -l "CHANGE_ME" | grep -v ".env.example" | grep -v ".github/workflows/"; then
             echo "❌ Found placeholder passwords in tracked files"
             exit 1
           fi
