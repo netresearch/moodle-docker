@@ -56,7 +56,6 @@ RUN docker-php-ext-install -j$(nproc) \
     gd \
     # XML
     xml \
-    xmlrpc \
     soap \
     # Internationalization
     intl \
