@@ -37,7 +37,7 @@ jobs:
 
       - name: Verify .gitignore excludes secrets
         run: |
-          if grep -q "^\.env$" .gitignore && grep -q "^moodle/$" .gitignore; then
+          if grep -q "^\.env$" .gitignore && grep -q "^/moodle/$" .gitignore; then
             echo "✅ .gitignore properly configured"
           else
             echo "❌ .gitignore missing critical entries"
