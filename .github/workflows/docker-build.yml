@@ -1,0 +1,243 @@
+name: Docker Build & Validate
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  MOODLE_BRANCH: MOODLE_405_STABLE
+
+jobs:
+  validate-compose:
+    name: Validate Docker Compose
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml syntax
+        run: |
+          docker compose config > /dev/null
+          echo "✅ Docker Compose syntax is valid"
+
+      - name: Check required files
+        run: |
+          files=(".env.example" "compose.yml" "docker/moodle/Dockerfile" "config/moodle-config.php")
+          for file in "${files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "❌ Missing required file: $file"
+              exit 1
+            fi
+          done
+          echo "✅ All required files present"
+
+      - name: Verify .gitignore excludes secrets
+        run: |
+          if grep -q "^\.env$" .gitignore && grep -q "^moodle/$" .gitignore; then
+            echo "✅ .gitignore properly configured"
+          else
+            echo "❌ .gitignore missing critical entries"
+            exit 1
+          fi
+
+      - name: Check for leaked secrets
+        run: |
+          if git ls-files | xargs grep -l "CHANGE_ME" | grep -v ".env.example"; then
+            echo "❌ Found placeholder passwords in tracked files"
+            exit 1
+          fi
+          echo "✅ No leaked secrets detected"
+
+  build-moodle-image:
+    name: Build Moodle Image
+    runs-on: ubuntu-latest
+    needs: validate-compose
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Moodle image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/moodle
+          file: ./docker/moodle/Dockerfile
+          push: false
+          tags: moodle:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify PHP version
+        run: |
+          docker build -t moodle:test ./docker/moodle
+          PHP_VERSION=$(docker run --rm moodle:test php -v | head -n 1)
+          echo "PHP Version: $PHP_VERSION"
+          if echo "$PHP_VERSION" | grep -q "PHP 8.3"; then
+            echo "✅ PHP 8.3 verified"
+          else
+            echo "❌ Expected PHP 8.3"
+            exit 1
+          fi
+
+      - name: Verify required PHP extensions
+        run: |
+          REQUIRED_EXTS="sodium mysqli gd intl zip opcache redis ldap mbstring xml"
+          for ext in $REQUIRED_EXTS; do
+            if docker run --rm moodle:test php -m | grep -q "^$ext$"; then
+              echo "✅ Extension found: $ext"
+            else
+              echo "❌ Missing required extension: $ext"
+              exit 1
+            fi
+          done
+
+      - name: Check PHP configuration
+        run: |
+          docker run --rm moodle:test php -i | grep -E "max_input_vars|memory_limit|upload_max_filesize"
+
+          # Verify max_input_vars >= 5000
+          MAX_INPUT_VARS=$(docker run --rm moodle:test php -r "echo ini_get('max_input_vars');")
+          if [ "$MAX_INPUT_VARS" -ge 5000 ]; then
+            echo "✅ max_input_vars = $MAX_INPUT_VARS (>= 5000)"
+          else
+            echo "❌ max_input_vars = $MAX_INPUT_VARS (need >= 5000)"
+            exit 1
+          fi
+
+  test-stack-startup:
+    name: Test Stack Startup
+    runs-on: ubuntu-latest
+    needs: build-moodle-image
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Clone Moodle
+        run: |
+          git clone -b ${{ env.MOODLE_BRANCH }} --depth 1 git://git.moodle.org/moodle.git
+          echo "✅ Moodle cloned successfully"
+
+      - name: Create .env file
+        run: |
+          cp .env.example .env
+          # Set test passwords (not for production!)
+          sed -i 's/CHANGE_ME_SECURE_PASSWORD_HERE/test_password_123/g' .env
+          sed -i 's/CHANGE_ME_SECURE_ROOT_PASSWORD_HERE/test_root_456/g' .env
+          sed -i 's/CHANGE_ME_SECURE_VALKEY_PASSWORD_HERE/test_valkey_789/g' .env
+
+      - name: Build and start services
+        run: |
+          docker compose build --no-cache
+          docker compose up -d
+          echo "✅ Services started"
+
+      - name: Wait for services to be healthy
+        run: |
+          echo "Waiting for services to be healthy..."
+          timeout 120 bash -c 'until docker compose ps | grep -q "healthy"; do sleep 2; done'
+          docker compose ps
+          echo "✅ Services are healthy"
+
+      - name: Check service health
+        run: |
+          services=("moodle" "database" "valkey")
+          for service in "${services[@]}"; do
+            if docker compose ps "$service" | grep -q "Up"; then
+              echo "✅ $service is running"
+            else
+              echo "❌ $service is not running"
+              docker compose logs "$service"
+              exit 1
+            fi
+          done
+
+      - name: Test web access
+        run: |
+          sleep 10  # Give Moodle time to initialize
+          HTTP_CODE=$(docker compose exec -T moodle curl -s -o /dev/null -w "%{http_code}" http://localhost/)
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "303" ]; then
+            echo "✅ Moodle web access working (HTTP $HTTP_CODE)"
+          else
+            echo "❌ Moodle web access failed (HTTP $HTTP_CODE)"
+            docker compose logs moodle
+            exit 1
+          fi
+
+      - name: Test database connection
+        run: |
+          docker compose exec -T database mysql -uroot -ptest_root_456 -e "SHOW DATABASES;" | grep -q "moodle"
+          echo "✅ Database connection working"
+
+      - name: Test Valkey connection
+        run: |
+          docker compose exec -T valkey valkey-cli -a test_valkey_789 PING | grep -q "PONG"
+          echo "✅ Valkey connection working"
+
+      - name: Test Ofelia cron
+        run: |
+          sleep 65  # Wait for cron to run at least once
+          if docker compose logs ofelia | grep -q "Job executed"; then
+            echo "✅ Ofelia cron is executing"
+          else
+            echo "⚠️  Warning: Ofelia cron not executed yet (may need more time)"
+            docker compose logs ofelia
+          fi
+
+      - name: Show service logs
+        if: always()
+        run: |
+          echo "=== Moodle Logs ==="
+          docker compose logs --tail=50 moodle
+          echo "=== Database Logs ==="
+          docker compose logs --tail=50 database
+          echo "=== Valkey Logs ==="
+          docker compose logs --tail=50 valkey
+          echo "=== Ofelia Logs ==="
+          docker compose logs --tail=50 ofelia
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v
+          rm -rf moodle
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build-moodle-image
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Moodle image
+        run: docker build -t moodle:scan ./docker/moodle
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'moodle:scan'
+          format: 'table'
+          exit-code: '0'  # Don't fail on vulnerabilities (informational only)
+          severity: 'CRITICAL,HIGH'
+
+  markdown-lint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Lint Markdown files
+        uses: DavidAnson/markdownlint-cli2-action@v14
+        with:
+          globs: '*.md'

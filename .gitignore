@@ -1,0 +1,30 @@
+# Environment configuration (contains secrets)
+.env
+
+# Moodle code (managed via git clone separately)
+moodle/
+
+# Backups (if created locally)
+backups/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker volumes (managed by Docker)
+# Not needed in .gitignore as they're not in the project directory
+
+# Temporary files
+tmp/
+temp/
+*.tmp

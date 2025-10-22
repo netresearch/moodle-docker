@@ -1,0 +1,145 @@
+version: '3.8'
+
+# Moodle 4.5 Production Stack
+# Services: Moodle + MariaDB 11 + Valkey 9 + Ofelia (cron)
+
+services:
+  # Moodle Application (PHP 8.3 + Apache)
+  moodle:
+    build:
+      context: ./docker/moodle
+      dockerfile: Dockerfile
+    container_name: ${COMPOSE_PROJECT_NAME:-moodle45}_moodle
+    restart: unless-stopped
+    networks:
+      - frontend
+      - backend
+    ports:
+      - "${MOODLE_DOCKER_WEB_PORT:-8080}:80"
+      - "${MOODLE_DOCKER_WEB_PORT_SSL:-8443}:443"
+    volumes:
+      # Moodle application code (git clone from host)
+      - ./moodle:/var/www/html:rw
+      # Moodle data directory (user files, cache, temp)
+      - moodledata:/var/moodledata:rw
+      # Custom Moodle configuration
+      - ./config/moodle-config.php:/var/www/html/config.php:ro
+    environment:
+      # Database
+      - DB_TYPE=${DB_TYPE:-mariadb}
+      - DB_HOST=${DB_HOST:-database}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_NAME=${DB_NAME:-moodle}
+      - DB_USER=${DB_USER:-moodleuser}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_PREFIX=${DB_PREFIX:-mdl_}
+      # Valkey (Redis-compatible)
+      - VALKEY_HOST=${VALKEY_HOST:-valkey}
+      - VALKEY_PORT=${VALKEY_PORT:-6379}
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD}
+      # Site configuration
+      - MOODLE_SITE_URL=${MOODLE_SITE_URL:-http://localhost:8080}
+    depends_on:
+      database:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      # Ofelia cron job: Run Moodle cron every minute
+      ofelia.enabled: "true"
+      ofelia.job-exec.moodle-cron.schedule: "@every 1m"
+      ofelia.job-exec.moodle-cron.command: "php /var/www/html/admin/cli/cron.php"
+      ofelia.job-exec.moodle-cron.user: "www-data"
+      # Traefik labels (disabled by default, uncomment when ready)
+      # traefik.enable: "false"
+      # traefik.http.routers.moodle.rule: "Host(`moodle.example.com`)"
+      # traefik.http.routers.moodle.entrypoints: "websecure"
+      # traefik.http.routers.moodle.tls.certresolver: "letsencrypt"
+      # traefik.http.services.moodle.loadbalancer.server.port: "80"
+
+  # MariaDB 11 Database
+  database:
+    image: mariadb:11
+    container_name: ${COMPOSE_PROJECT_NAME:-moodle45}_database
+    restart: unless-stopped
+    networks:
+      - backend
+    volumes:
+      # Database data
+      - db_data:/var/lib/mysql
+      # Custom MariaDB configuration
+      - ./docker/mariadb/custom.cnf:/etc/mysql/conf.d/custom.cnf:ro
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${DB_NAME:-moodle}
+      - MYSQL_USER=${DB_USER:-moodleuser}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_INITDB_SKIP_TZINFO=1
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Valkey 9 (Redis-compatible) - Cache & Sessions
+  valkey:
+    image: valkey/valkey:9-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-moodle45}_valkey
+    restart: unless-stopped
+    networks:
+      - backend
+    volumes:
+      # Valkey data (optional, cache can be ephemeral)
+      - valkey_data:/data
+      # Custom Valkey configuration
+      - ./docker/valkey/valkey.conf:/usr/local/etc/valkey/valkey.conf:ro
+    command: valkey-server /usr/local/etc/valkey/valkey.conf --requirepass ${VALKEY_PASSWORD}
+    healthcheck:
+      test: ["CMD", "valkey-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Ofelia Cron Scheduler
+  ofelia:
+    image: mcuadros/ofelia:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-moodle45}_ofelia
+    restart: unless-stopped
+    networks:
+      - backend
+    volumes:
+      # Docker socket for container orchestration
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: daemon --docker
+    depends_on:
+      - moodle
+
+# Networks
+networks:
+  frontend:
+    driver: bridge
+    name: ${COMPOSE_PROJECT_NAME:-moodle45}_frontend
+  backend:
+    driver: bridge
+    name: ${COMPOSE_PROJECT_NAME:-moodle45}_backend
+    internal: false  # Set to true for complete isolation (no internet access)
+
+# Volumes
+volumes:
+  moodledata:
+    name: ${COMPOSE_PROJECT_NAME:-moodle45}_moodledata
+    driver: local
+  db_data:
+    name: ${COMPOSE_PROJECT_NAME:-moodle45}_db_data
+    driver: local
+  valkey_data:
+    name: ${COMPOSE_PROJECT_NAME:-moodle45}_valkey_data
+    driver: local

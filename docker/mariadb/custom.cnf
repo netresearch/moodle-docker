@@ -1,0 +1,92 @@
+# MariaDB 11 Custom Configuration for Moodle
+# Optimized for production use
+
+[mysqld]
+
+# ============================================================================
+# Character Set & Collation (Required for Moodle)
+# ============================================================================
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+skip-character-set-client-handshake
+
+# ============================================================================
+# InnoDB Settings (Performance)
+# ============================================================================
+# Buffer pool size: 50-70% of available RAM for dedicated DB server
+# Adjust based on your server: 1G for 2GB RAM, 2G for 4GB RAM, etc.
+innodb_buffer_pool_size = 1G
+
+# Log file size: 25% of buffer pool size
+innodb_log_file_size = 256M
+
+# Flush log at transaction commit
+# 0 = write and flush once per second (best performance, slight risk)
+# 1 = write and flush at each commit (safest, slower)
+# 2 = write at commit, flush once per second (good balance)
+innodb_flush_log_at_trx_commit = 2
+
+# Flush method (reduces double buffering)
+innodb_flush_method = O_DIRECT
+
+# File per table (recommended for flexibility)
+innodb_file_per_table = 1
+
+# I/O capacity (adjust based on storage: 200 for HDD, 2000+ for SSD)
+innodb_io_capacity = 2000
+innodb_io_capacity_max = 4000
+
+# ============================================================================
+# Connection Settings
+# ============================================================================
+max_connections = 200
+max_allowed_packet = 64M
+wait_timeout = 600
+interactive_timeout = 600
+
+# ============================================================================
+# Query Cache (Disabled - deprecated in MariaDB 10.5+)
+# ============================================================================
+query_cache_type = 0
+query_cache_size = 0
+
+# ============================================================================
+# Logging
+# ============================================================================
+# Error log
+log_error = /var/log/mysql/error.log
+
+# Slow query log (optional - enable for performance tuning)
+# slow_query_log = 1
+# slow_query_log_file = /var/log/mysql/slow-query.log
+# long_query_time = 2
+
+# General log (optional - enable only for debugging, very verbose)
+# general_log = 0
+# general_log_file = /var/log/mysql/general.log
+
+# ============================================================================
+# Table Settings
+# ============================================================================
+# Default storage engine
+default-storage-engine = InnoDB
+
+# Maximum table size
+max_heap_table_size = 64M
+tmp_table_size = 64M
+
+# ============================================================================
+# Binary Logging (Optional - for replication or point-in-time recovery)
+# ============================================================================
+# Uncomment if you need binary logs
+# server-id = 1
+# log_bin = /var/log/mysql/mysql-bin.log
+# binlog_format = ROW
+# expire_logs_days = 7
+# max_binlog_size = 100M
+
+[client]
+default-character-set = utf8mb4
+
+[mysql]
+default-character-set = utf8mb4
