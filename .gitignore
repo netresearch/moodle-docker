@@ -1,5 +1,6 @@
 # Environment configuration (contains secrets)
 .env
+.envrc.local
 
 # Moodle code (managed via git clone separately)
 /moodle/

@@ -70,20 +70,39 @@ The `compose.yml` includes both `image:` and `build:` directives:
 
 ## Quick Start
 
-### 1. Clone Moodle Repository
+### Using Makefile (Recommended)
 
 ```bash
-# Clone Moodle 4.5 stable branch
-git clone -b MOODLE_405_STABLE --depth 1 git://git.moodle.org/moodle.git
+# 1. Clone Moodle code
+make clone-moodle
 
-# Verify branch
-cd moodle
-git branch
-# Should show: * MOODLE_405_STABLE
-cd ..
+# 2. Create .env file
+make setup
+# Edit .env and set secure passwords!
+
+# 3. Start the stack
+make start
+
+# Check status
+make status
+
+# View all available commands
+make help
 ```
 
-### 2. Configure Environment
+### Manual Setup
+
+<details>
+<summary>Click to expand manual setup instructions</summary>
+
+#### 1. Clone Moodle Repository
+
+```bash
+# Clone Moodle 4.5 stable branch (shallow clone)
+git clone -b MOODLE_405_STABLE --depth 1 git://git.moodle.org/moodle.git
+```
+
+#### 2. Configure Environment
 
 ```bash
 # Copy environment template
@@ -104,7 +123,7 @@ nano .env
 - `VALKEY_PASSWORD`: Set secure password
 - `MOODLE_SITE_URL`: Update for production (e.g., `https://moodle.example.com`)
 
-### 3. Start Services
+#### 3. Start Services
 
 ```bash
 # Pull pre-built image and start all services
@@ -116,6 +135,34 @@ docker compose ps
 # View logs
 docker compose logs -f moodle
 ```
+
+</details>
+
+## Traefik Integration
+
+For production deployments with Traefik reverse proxy:
+
+```bash
+# 1. Configure Traefik variables in .env
+MOODLE_DOMAIN=moodle.example.com
+MOODLE_SITE_URL=https://moodle.example.com
+TRAEFIK_NETWORK=traefik
+TRAEFIK_CERTRESOLVER=letsencrypt
+
+# 2. Start with Traefik
+make start-traefik
+
+# Or manually:
+docker compose -f compose.yml -f compose.traefik.yml up -d
+```
+
+**Traefik features:**
+- ✅ Automatic HTTPS with Let's Encrypt
+- ✅ No exposed ports (Traefik handles routing)
+- ✅ HTTP to HTTPS redirect
+- ✅ Custom domain support
+
+## Installation
 
 ### 4. Install Moodle
 
