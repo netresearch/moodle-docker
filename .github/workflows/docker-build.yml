@@ -88,7 +88,7 @@ jobs:
 
       - name: Verify required PHP extensions
         run: |
-          REQUIRED_EXTS="sodium mysqli gd intl zip opcache redis ldap mbstring xml"
+          REQUIRED_EXTS="sodium mysqli gd intl zip redis ldap mbstring xml"
           for ext in $REQUIRED_EXTS; do
             if docker run --rm moodle:test php -m | grep -q "^$ext$"; then
               echo "✅ Extension found: $ext"
@@ -97,6 +97,14 @@ jobs:
               exit 1
             fi
           done
+
+          # OPcache shows as "Zend OPcache" in php -m output
+          if docker run --rm moodle:test php -m | grep -q "Zend OPcache"; then
+            echo "✅ Extension found: opcache (Zend OPcache)"
+          else
+            echo "❌ Missing required extension: opcache"
+            exit 1
+          fi
 
       - name: Check PHP configuration
         run: |
