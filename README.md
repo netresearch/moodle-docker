@@ -31,10 +31,30 @@ Production-ready Docker Compose stack for Moodle 4.5 LMS with PHP 8.3, MariaDB 1
 
 ## Components
 
-- **Moodle**: PHP 8.3 + Apache on Debian Bookworm
+- **Moodle**: PHP 8.3 + Apache on Debian Bookworm (available at `ghcr.io/netresearch/moodle-docker/moodle:latest`)
 - **MariaDB 11**: Database server with optimized configuration
 - **Valkey 9**: Redis-compatible cache and session storage
 - **Ofelia**: Docker-native cron scheduler for Moodle tasks
+
+## Pre-built Docker Image
+
+The Moodle image is automatically built and published to GitHub Container Registry:
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/netresearch/moodle-docker/moodle:latest
+
+# Or use in compose.yml instead of building locally
+services:
+  moodle:
+    image: ghcr.io/netresearch/moodle-docker/moodle:latest
+    # ... rest of configuration
+```
+
+Available tags:
+- `latest` - Latest build from main branch
+- `main` - Latest build from main branch
+- `main-<sha>` - Specific commit from main branch
 
 ## Prerequisites
 

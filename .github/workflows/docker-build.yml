@@ -56,6 +56,9 @@ jobs:
     name: Build Moodle Image
     runs-on: ubuntu-latest
     needs: validate-compose
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout code
@@ -64,19 +67,49 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/moodle
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
       - name: Build Moodle image
         uses: docker/build-push-action@v5
         with:
           context: ./docker/moodle
           file: ./docker/moodle/Dockerfile
-          push: false
-          tags: moodle:test
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Build test image for validation
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/moodle
+          file: ./docker/moodle/Dockerfile
+          load: true
+          tags: moodle:test
+          cache-from: type=gha
+
       - name: Verify PHP version
         run: |
-          docker build -t moodle:test ./docker/moodle
           PHP_VERSION=$(docker run --rm moodle:test php -v | head -n 1)
           echo "PHP Version: $PHP_VERSION"
           if echo "$PHP_VERSION" | grep -q "PHP 8.3"; then
