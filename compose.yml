@@ -66,7 +66,7 @@ services:
 
   # MariaDB 11 Database
   database:
-    image: mariadb:11
+    image: mariadb:12
     container_name: ${COMPOSE_PROJECT_NAME:-moodle45}_database
     restart: unless-stopped
     networks:
