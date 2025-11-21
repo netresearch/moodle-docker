@@ -1,7 +1,7 @@
 # Moodle 4.5 Production Docker Image
 # PHP 8.3 + Apache on Debian Bookworm
 
-FROM php:8.3-apache-bookworm
+FROM php:8.5-apache-bookworm
 
 LABEL maintainer="Your Team <team@example.com>"
 LABEL description="Moodle 4.5 LMS with PHP 8.3"
