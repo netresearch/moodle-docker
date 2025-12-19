@@ -243,7 +243,7 @@ docker compose exec database mysqldump -u root -p moodle | gzip > backup-$(date 
 ## What's Running?
 
 | Service | Purpose | Port | Access |
-|---------|---------|------|--------|
+| ------- | ------- | ---- | ------ |
 | Moodle | Web application | 8080 | http://localhost:8080 |
 | MariaDB | Database | - | Internal only |
 | Valkey | Cache + Sessions | - | Internal only |
