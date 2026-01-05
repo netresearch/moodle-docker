@@ -295,7 +295,7 @@ docker compose exec moodle php admin/cli/purge_caches.php
 docker compose exec moodle php admin/cli/maintenance.php --disable
 ```
 
-## Traefik Integration
+## Manual Traefik Configuration
 
 To enable Traefik reverse proxy with automatic SSL:
 
