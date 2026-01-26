@@ -163,7 +163,7 @@ services:
   # Ofelia - Cron Scheduler
   # ==========================================================================
   ofelia:
-    image: netresearch/ofelia:latest
+    image: mcuadros/ofelia:latest
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_ofelia
     restart: unless-stopped
     command: daemon --docker
