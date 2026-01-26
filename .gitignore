@@ -5,6 +5,9 @@
 # Moodle code (managed via git clone separately)
 /moodle/
 
+# Moodle data directory (runtime data)
+/moodledata/
+
 # Backups (if created locally)
 backups/
 
