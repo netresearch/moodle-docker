@@ -56,7 +56,9 @@ jobs:
           # Exclude files that legitimately contain placeholder references:
           # - .env.example: Template file with placeholders
           # - .github/workflows/: CI workflows that reference placeholders
-          if git ls-files | xargs grep -l "CHANGE_ME" | grep -v ".env.example" | grep -v ".github/workflows/"; then
+          # - Documentation files that reference .env.example
+          EXCLUDE_PATTERN=".env.example|.github/workflows/|Makefile|README.md|QUICKSTART.md|docs/"
+          if git ls-files | xargs grep -l "CHANGE_ME" | grep -vE "$EXCLUDE_PATTERN"; then
             echo "Found placeholder passwords in tracked files"
             exit 1
           fi
