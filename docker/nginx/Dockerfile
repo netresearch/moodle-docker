@@ -1,7 +1,7 @@
 # nginx with Brotli + HTTP/2 + HTTP/3 (QUIC)
 # Multi-stage build to compile brotli module
 
-FROM nginx:1.27-alpine AS builder
+FROM nginx:1.29-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -38,7 +38,7 @@ RUN NGINX_VERSION=$(nginx -v 2>&1 | sed 's/.*nginx\///' ) && \
 # =============================================================================
 # Final image
 # =============================================================================
-FROM nginx:1.27-alpine
+FROM nginx:1.29-alpine
 
 LABEL maintainer="Netresearch <info@netresearch.de>"
 LABEL description="nginx with Brotli, HTTP/2, and HTTP/3 for Moodle 5.x"
