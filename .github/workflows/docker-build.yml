@@ -122,7 +122,8 @@ jobs:
 
       - name: Verify PHP version
         run: |
-          PHP_VERSION=$(docker run --rm moodle:test php -v | head -n 1)
+          # Override entrypoint to run PHP directly
+          PHP_VERSION=$(docker run --rm --entrypoint php moodle:test -v | head -n 1)
           echo "PHP Version: $PHP_VERSION"
           if echo "$PHP_VERSION" | grep -q "PHP 8.4"; then
             echo "PHP 8.4 verified"
@@ -135,7 +136,7 @@ jobs:
         run: |
           REQUIRED_EXTS="sodium mysqli gd intl zip redis ldap mbstring xml"
           for ext in $REQUIRED_EXTS; do
-            if docker run --rm moodle:test php -m | grep -q "^$ext$"; then
+            if docker run --rm --entrypoint php moodle:test -m | grep -q "^$ext$"; then
               echo "Extension found: $ext"
             else
               echo "Missing required extension: $ext"
@@ -144,7 +145,7 @@ jobs:
           done
 
           # OPcache shows as "Zend OPcache" in php -m output
-          if docker run --rm moodle:test php -m | grep -q "Zend OPcache"; then
+          if docker run --rm --entrypoint php moodle:test -m | grep -q "Zend OPcache"; then
             echo "Extension found: opcache (Zend OPcache)"
           else
             echo "Missing required extension: opcache"
@@ -153,10 +154,10 @@ jobs:
 
       - name: Check PHP configuration
         run: |
-          docker run --rm moodle:test php -i | grep -E "max_input_vars|memory_limit|upload_max_filesize"
+          docker run --rm --entrypoint php moodle:test -i | grep -E "max_input_vars|memory_limit|upload_max_filesize"
 
           # Verify max_input_vars >= 5000
-          MAX_INPUT_VARS=$(docker run --rm moodle:test php -r "echo ini_get('max_input_vars');")
+          MAX_INPUT_VARS=$(docker run --rm --entrypoint php moodle:test -r "echo ini_get('max_input_vars');")
           if [ "$MAX_INPUT_VARS" -ge 5000 ]; then
             echo "max_input_vars = $MAX_INPUT_VARS (>= 5000)"
           else
