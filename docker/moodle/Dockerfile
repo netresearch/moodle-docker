@@ -9,7 +9,7 @@ LABEL description="Moodle 5.x PHP-FPM runtime"
 # Build dependencies (removed after compile)
 ARG BUILD_DEPS="autoconf g++ make libpng-dev libjpeg-turbo-dev freetype-dev \
     libxml2-dev icu-dev libzip-dev libsodium-dev oniguruma-dev \
-    postgresql-dev openldap-dev bzip2-dev curl-dev"
+    postgresql-dev openldap-dev bzip2-dev curl-dev linux-headers"
 
 # Runtime dependencies
 ARG RUNTIME_DEPS="bash curl git unzip \
