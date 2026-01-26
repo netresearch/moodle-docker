@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  MOODLE_BRANCH: MOODLE_501_STABLE
+  MOODLE_VERSION: "5.1.1"
 
 jobs:
   validate-compose:
@@ -19,6 +19,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Create test .env file
+        run: |
+          cp .env.example .env
+          sed -i 's/CHANGE_ME_SECURE_PASSWORD/test_password_123/g' .env
+          sed -i 's/CHANGE_ME_SECURE_ROOT_PASSWORD/test_root_456/g' .env
+          sed -i 's/CHANGE_ME_SECURE_VALKEY_PASSWORD/test_valkey_789/g' .env
+
       - name: Validate docker-compose.yml syntax
         run: |
           docker compose config > /dev/null
@@ -26,7 +33,7 @@ jobs:
 
       - name: Check required files
         run: |
-          files=(".env.example" "compose.yml" "docker/moodle/Dockerfile" "docker/nginx/Dockerfile" "config/moodle-config.php")
+          files=(".env.example" "compose.yml" "docker/moodle/Dockerfile" "docker/moodle/entrypoint.sh" "docker/nginx/Dockerfile" "docker/nginx/nginx.conf")
           for file in "${files[@]}"; do
             if [ ! -f "$file" ]; then
               echo "Missing required file: $file"
@@ -37,7 +44,7 @@ jobs:
 
       - name: Verify .gitignore excludes secrets
         run: |
-          if grep -q "^\.env$" .gitignore && grep -q "^/moodle/$" .gitignore; then
+          if grep -q "^\.env$" .gitignore && grep -q "docker/nginx/ssl/\*\.pem$" .gitignore; then
             echo ".gitignore properly configured"
           else
             echo ".gitignore missing critical entries"
@@ -49,8 +56,7 @@ jobs:
           # Exclude files that legitimately contain placeholder references:
           # - .env.example: Template file with placeholders
           # - .github/workflows/: CI workflows that reference placeholders
-          # - Makefile: Contains sed commands to replace placeholders
-          if git ls-files | xargs grep -l "CHANGE_ME" | grep -v ".env.example" | grep -v ".github/workflows/" | grep -v "Makefile"; then
+          if git ls-files | xargs grep -l "CHANGE_ME" | grep -v ".env.example" | grep -v ".github/workflows/"; then
             echo "Found placeholder passwords in tracked files"
             exit 1
           fi
@@ -218,6 +224,17 @@ jobs:
           docker run --rm moodle-nginx:test nginx -t
           echo "Nginx configuration is valid"
 
+      - name: Verify Brotli module
+        run: |
+          # Check brotli module is loaded
+          if docker run --rm moodle-nginx:test nginx -V 2>&1 | grep -q "brotli"; then
+            echo "Brotli module verified"
+          else
+            # Check if module files exist
+            docker run --rm moodle-nginx:test ls -la /usr/lib/nginx/modules/ | grep brotli
+            echo "Brotli modules present"
+          fi
+
   test-stack-startup:
     name: Test Stack Startup
     runs-on: ubuntu-latest
@@ -227,18 +244,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Clone Moodle
-        run: |
-          git clone -b ${{ env.MOODLE_BRANCH }} --depth 1 git://git.moodle.org/moodle.git
-          echo "Moodle cloned successfully"
-
       - name: Create .env file
         run: |
           cp .env.example .env
-          # Set test passwords (not for production!)
-          sed -i 's/CHANGE_ME_SECURE_PASSWORD_HERE/test_password_123/g' .env
-          sed -i 's/CHANGE_ME_SECURE_ROOT_PASSWORD_HERE/test_root_456/g' .env
-          sed -i 's/CHANGE_ME_SECURE_VALKEY_PASSWORD_HERE/test_valkey_789/g' .env
+          sed -i 's/CHANGE_ME_SECURE_PASSWORD/test_password_123/g' .env
+          sed -i 's/CHANGE_ME_SECURE_ROOT_PASSWORD/test_root_456/g' .env
+          sed -i 's/CHANGE_ME_SECURE_VALKEY_PASSWORD/test_valkey_789/g' .env
+
+      - name: Generate SSL certificates
+        run: |
+          mkdir -p docker/nginx/ssl
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout docker/nginx/ssl/key.pem \
+            -out docker/nginx/ssl/cert.pem \
+            -subj "/CN=localhost/O=CI Test/C=US"
 
       - name: Build and start services
         run: |
@@ -249,8 +268,8 @@ jobs:
       - name: Wait for services to be healthy
         run: |
           echo "Waiting for services to be healthy..."
-          # Longer timeout for Moodle 5.1 (runtime download may take time)
-          timeout 180 bash -c 'until docker compose ps | grep -q "healthy"; do sleep 5; done'
+          # Longer timeout for Moodle 5.1 (runtime download takes time)
+          timeout 300 bash -c 'until docker compose ps moodle | grep -q "healthy"; do sleep 10; echo "Waiting..."; docker compose ps; done'
           docker compose ps
           echo "Services are healthy"
 
@@ -269,7 +288,7 @@ jobs:
 
       - name: Test web access
         run: |
-          sleep 15  # Give Moodle time to initialize
+          sleep 15  # Give services time to settle
           # Test via nginx (port 80)
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/)
           if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "303" ]; then
@@ -319,7 +338,6 @@ jobs:
         if: always()
         run: |
           docker compose down -v
-          rm -rf moodle
 
   security-scan:
     name: Security Scan
