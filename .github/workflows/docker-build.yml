@@ -223,7 +223,9 @@ jobs:
       - name: Verify Nginx configuration
         run: |
           # Test nginx config syntax
-          docker run --rm moodle-nginx:test nginx -t
+          # Note: nginx -t fails with "host not found in upstream" because moodle container isn't running
+          # Use --add-host to provide a fake DNS resolution for the upstream
+          docker run --rm --add-host moodle:127.0.0.1 moodle-nginx:test nginx -t
           echo "Nginx configuration is valid"
 
       - name: Verify Brotli module
