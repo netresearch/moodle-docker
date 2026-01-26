@@ -161,8 +161,9 @@ global \$CFG;
 
 // =============================================================================
 // Reverse Proxy Settings
+// Only enable when behind an external SSL-terminating proxy (Traefik, CloudFlare, etc.)
 // =============================================================================
-\$CFG->reverseproxy = true;
+\$CFG->reverseproxy = ${ssl_proxy_php};
 \$CFG->sslproxy = ${ssl_proxy_php};
 
 // =============================================================================
