@@ -63,6 +63,7 @@ services:
       - SSL_PROXY=${SSL_PROXY:-false}
       - MOODLE_DEBUG=${MOODLE_DEBUG:-false}
     networks:
+      - frontend  # Needs internet access for Moodle download
       - backend
     depends_on:
       database:
