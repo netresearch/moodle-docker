@@ -32,3 +32,6 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+
+# SSL certificates (use your own for production)
+docker/nginx/ssl/*.pem
