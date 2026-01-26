@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  MOODLE_BRANCH: MOODLE_405_STABLE
+  MOODLE_BRANCH: MOODLE_501_STABLE
 
 jobs:
   validate-compose:
@@ -22,25 +22,25 @@ jobs:
       - name: Validate docker-compose.yml syntax
         run: |
           docker compose config > /dev/null
-          echo "✅ Docker Compose syntax is valid"
+          echo "Docker Compose syntax is valid"
 
       - name: Check required files
         run: |
-          files=(".env.example" "compose.yml" "docker/moodle/Dockerfile" "config/moodle-config.php")
+          files=(".env.example" "compose.yml" "docker/moodle/Dockerfile" "docker/nginx/Dockerfile" "config/moodle-config.php")
           for file in "${files[@]}"; do
             if [ ! -f "$file" ]; then
-              echo "❌ Missing required file: $file"
+              echo "Missing required file: $file"
               exit 1
             fi
           done
-          echo "✅ All required files present"
+          echo "All required files present"
 
       - name: Verify .gitignore excludes secrets
         run: |
           if grep -q "^\.env$" .gitignore && grep -q "^/moodle/$" .gitignore; then
-            echo "✅ .gitignore properly configured"
+            echo ".gitignore properly configured"
           else
-            echo "❌ .gitignore missing critical entries"
+            echo ".gitignore missing critical entries"
             exit 1
           fi
 
@@ -51,10 +51,10 @@ jobs:
           # - .github/workflows/: CI workflows that reference placeholders
           # - Makefile: Contains sed commands to replace placeholders
           if git ls-files | xargs grep -l "CHANGE_ME" | grep -v ".env.example" | grep -v ".github/workflows/" | grep -v "Makefile"; then
-            echo "❌ Found placeholder passwords in tracked files"
+            echo "Found placeholder passwords in tracked files"
             exit 1
           fi
-          echo "✅ No leaked secrets detected"
+          echo "No leaked secrets detected"
 
   build-moodle-image:
     name: Build Moodle Image
@@ -116,10 +116,10 @@ jobs:
         run: |
           PHP_VERSION=$(docker run --rm moodle:test php -v | head -n 1)
           echo "PHP Version: $PHP_VERSION"
-          if echo "$PHP_VERSION" | grep -q "PHP 8.3"; then
-            echo "✅ PHP 8.3 verified"
+          if echo "$PHP_VERSION" | grep -q "PHP 8.4"; then
+            echo "PHP 8.4 verified"
           else
-            echo "❌ Expected PHP 8.3"
+            echo "Expected PHP 8.4"
             exit 1
           fi
 
@@ -128,18 +128,18 @@ jobs:
           REQUIRED_EXTS="sodium mysqli gd intl zip redis ldap mbstring xml"
           for ext in $REQUIRED_EXTS; do
             if docker run --rm moodle:test php -m | grep -q "^$ext$"; then
-              echo "✅ Extension found: $ext"
+              echo "Extension found: $ext"
             else
-              echo "❌ Missing required extension: $ext"
+              echo "Missing required extension: $ext"
               exit 1
             fi
           done
 
           # OPcache shows as "Zend OPcache" in php -m output
           if docker run --rm moodle:test php -m | grep -q "Zend OPcache"; then
-            echo "✅ Extension found: opcache (Zend OPcache)"
+            echo "Extension found: opcache (Zend OPcache)"
           else
-            echo "❌ Missing required extension: opcache"
+            echo "Missing required extension: opcache"
             exit 1
           fi
 
@@ -150,16 +150,78 @@ jobs:
           # Verify max_input_vars >= 5000
           MAX_INPUT_VARS=$(docker run --rm moodle:test php -r "echo ini_get('max_input_vars');")
           if [ "$MAX_INPUT_VARS" -ge 5000 ]; then
-            echo "✅ max_input_vars = $MAX_INPUT_VARS (>= 5000)"
+            echo "max_input_vars = $MAX_INPUT_VARS (>= 5000)"
           else
-            echo "❌ max_input_vars = $MAX_INPUT_VARS (need >= 5000)"
+            echo "max_input_vars = $MAX_INPUT_VARS (need >= 5000)"
             exit 1
           fi
+
+  build-nginx-image:
+    name: Build Nginx Image
+    runs-on: ubuntu-latest
+    needs: validate-compose
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/moodle-nginx
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-,enable=${{ github.event_name != 'pull_request' }}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build Nginx image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/nginx
+          file: ./docker/nginx/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build test image for validation
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker/nginx
+          file: ./docker/nginx/Dockerfile
+          load: true
+          tags: moodle-nginx:test
+          cache-from: type=gha
+
+      - name: Verify Nginx configuration
+        run: |
+          # Test nginx config syntax
+          docker run --rm moodle-nginx:test nginx -t
+          echo "Nginx configuration is valid"
 
   test-stack-startup:
     name: Test Stack Startup
     runs-on: ubuntu-latest
-    needs: build-moodle-image
+    needs: [build-moodle-image, build-nginx-image]
 
     steps:
       - name: Checkout code
@@ -168,7 +230,7 @@ jobs:
       - name: Clone Moodle
         run: |
           git clone -b ${{ env.MOODLE_BRANCH }} --depth 1 git://git.moodle.org/moodle.git
-          echo "✅ Moodle cloned successfully"
+          echo "Moodle cloned successfully"
 
       - name: Create .env file
         run: |
@@ -182,23 +244,24 @@ jobs:
         run: |
           docker compose build --no-cache
           docker compose up -d
-          echo "✅ Services started"
+          echo "Services started"
 
       - name: Wait for services to be healthy
         run: |
           echo "Waiting for services to be healthy..."
-          timeout 120 bash -c 'until docker compose ps | grep -q "healthy"; do sleep 2; done'
+          # Longer timeout for Moodle 5.1 (runtime download may take time)
+          timeout 180 bash -c 'until docker compose ps | grep -q "healthy"; do sleep 5; done'
           docker compose ps
-          echo "✅ Services are healthy"
+          echo "Services are healthy"
 
       - name: Check service health
         run: |
-          services=("moodle" "database" "valkey")
+          services=("moodle" "nginx" "database" "valkey")
           for service in "${services[@]}"; do
             if docker compose ps "$service" | grep -q "Up"; then
-              echo "✅ $service is running"
+              echo "$service is running"
             else
-              echo "❌ $service is not running"
+              echo "$service is not running"
               docker compose logs "$service"
               exit 1
             fi
@@ -206,12 +269,14 @@ jobs:
 
       - name: Test web access
         run: |
-          sleep 10  # Give Moodle time to initialize
-          HTTP_CODE=$(docker compose exec -T moodle curl -s -o /dev/null -w "%{http_code}" http://localhost/)
+          sleep 15  # Give Moodle time to initialize
+          # Test via nginx (port 80)
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/)
           if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "303" ]; then
-            echo "✅ Moodle web access working (HTTP $HTTP_CODE)"
+            echo "Moodle web access working (HTTP $HTTP_CODE)"
           else
-            echo "❌ Moodle web access failed (HTTP $HTTP_CODE)"
+            echo "Moodle web access failed (HTTP $HTTP_CODE)"
+            docker compose logs nginx
             docker compose logs moodle
             exit 1
           fi
@@ -219,20 +284,20 @@ jobs:
       - name: Test database connection
         run: |
           docker compose exec -T database mariadb -uroot -ptest_root_456 -e "SHOW DATABASES;" | grep -q "moodle"
-          echo "✅ Database connection working"
+          echo "Database connection working"
 
       - name: Test Valkey connection
         run: |
           docker compose exec -T valkey valkey-cli -a test_valkey_789 PING | grep -q "PONG"
-          echo "✅ Valkey connection working"
+          echo "Valkey connection working"
 
       - name: Test Ofelia cron
         run: |
           sleep 65  # Wait for cron to run at least once
           if docker compose logs ofelia | grep -q "Job executed"; then
-            echo "✅ Ofelia cron is executing"
+            echo "Ofelia cron is executing"
           else
-            echo "⚠️  Warning: Ofelia cron not executed yet (may need more time)"
+            echo "Warning: Ofelia cron not executed yet (may need more time)"
             docker compose logs ofelia
           fi
 
@@ -241,6 +306,8 @@ jobs:
         run: |
           echo "=== Moodle Logs ==="
           docker compose logs --tail=50 moodle
+          echo "=== Nginx Logs ==="
+          docker compose logs --tail=50 nginx
           echo "=== Database Logs ==="
           docker compose logs --tail=50 database
           echo "=== Valkey Logs ==="
@@ -257,7 +324,7 @@ jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
-    needs: build-moodle-image
+    needs: [build-moodle-image, build-nginx-image]
 
     steps:
       - name: Checkout code
@@ -266,10 +333,21 @@ jobs:
       - name: Build Moodle image
         run: docker build -t moodle:scan ./docker/moodle
 
-      - name: Run Trivy vulnerability scanner
+      - name: Build Nginx image
+        run: docker build -t moodle-nginx:scan ./docker/nginx
+
+      - name: Run Trivy on Moodle image
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: 'moodle:scan'
+          format: 'table'
+          exit-code: '0'  # Don't fail on vulnerabilities (informational only)
+          severity: 'CRITICAL,HIGH'
+
+      - name: Run Trivy on Nginx image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'moodle-nginx:scan'
           format: 'table'
           exit-code: '0'  # Don't fail on vulnerabilities (informational only)
           severity: 'CRITICAL,HIGH'
