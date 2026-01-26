@@ -130,4 +130,4 @@ docker compose down -v
 
 - See `README.md` for full documentation
 - Configure SSL with a reverse proxy for production
-- Customize `config/moodle-config.php` for advanced settings
+- Customize via environment variables in `.env`
