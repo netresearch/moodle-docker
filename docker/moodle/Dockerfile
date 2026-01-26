@@ -1,97 +1,47 @@
-# Moodle 4.5 Production Docker Image
-# PHP 8.3 + Apache on Debian Bookworm
+# Moodle 5.x Runtime Image
+# PHP 8.4 FPM on Alpine
 
-FROM php:8.3-apache-bookworm
+FROM php:8.4-fpm-alpine
 
-LABEL maintainer="Your Team <team@example.com>"
-LABEL description="Moodle 4.5 LMS with PHP 8.3"
+LABEL maintainer="Netresearch <info@netresearch.de>"
+LABEL description="Moodle 5.x PHP-FPM runtime"
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    # Core utilities
-    wget \
-    curl \
-    zip \
-    unzip \
-    git \
-    # Image processing
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    # XML and internationalization
-    libxml2-dev \
-    libicu-dev \
-    # Database clients
-    default-mysql-client \
-    libpq-dev \
-    # LDAP
-    libldap2-dev \
-    # Sodium (required for Moodle 4.5)
-    libsodium-dev \
-    # Compression
-    libbz2-dev \
-    libzip-dev \
-    # Other libraries
-    libonig-dev \
-    libcurl4-openssl-dev \
-    # Cleanup
-    && rm -rf /var/lib/apt/lists/*
+# Build dependencies (removed after compile)
+ARG BUILD_DEPS="autoconf g++ make libpng-dev libjpeg-turbo-dev freetype-dev \
+    libxml2-dev icu-dev libzip-dev libsodium-dev oniguruma-dev \
+    postgresql-dev openldap-dev bzip2-dev curl-dev"
 
-# Configure GD with FreeType and JPEG support
-RUN docker-php-ext-configure gd \
-    --with-freetype \
-    --with-jpeg
+# Runtime dependencies
+ARG RUNTIME_DEPS="bash curl git unzip \
+    libpng libjpeg-turbo freetype libxml2 icu-libs libzip libsodium \
+    oniguruma postgresql-libs libldap libbz2 \
+    fcgi"
 
-# Configure LDAP
-RUN docker-php-ext-configure ldap --with-libdir=lib/x86_64-linux-gnu/
+# Install dependencies and PHP extensions
+RUN apk add --no-cache $RUNTIME_DEPS $BUILD_DEPS \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-configure ldap \
+    && docker-php-ext-install -j$(nproc) \
+        mysqli pdo_mysql \
+        pgsql pdo_pgsql \
+        gd \
+        xml soap \
+        intl \
+        mbstring \
+        zip bz2 \
+        bcmath \
+        opcache \
+        ldap \
+        sodium \
+        exif \
+        sockets \
+        pcntl \
+    && pecl install redis igbinary apcu \
+    && docker-php-ext-enable redis igbinary apcu \
+    && apk del $BUILD_DEPS \
+    && rm -rf /tmp/* /var/cache/apk/*
 
-# Install PHP extensions required by Moodle
-RUN docker-php-ext-install -j$(nproc) \
-    # Core required
-    mysqli \
-    pdo_mysql \
-    pgsql \
-    pdo_pgsql \
-    # Image processing
-    gd \
-    # XML
-    xml \
-    soap \
-    # Internationalization
-    intl \
-    # String handling
-    mbstring \
-    # Compression
-    zip \
-    bz2 \
-    # Math
-    bcmath \
-    # System V
-    sysvmsg \
-    sysvsem \
-    sysvshm \
-    # Process control
-    pcntl \
-    # Sockets
-    sockets \
-    # Other
-    exif \
-    ftp \
-    calendar \
-    gettext \
-    # Required: sodium
-    sodium \
-    # Performance
-    opcache \
-    # LDAP
-    ldap
-
-# Install PECL extensions
-RUN pecl install redis-6.0.2 && docker-php-ext-enable redis
-RUN pecl install apcu-5.1.23 && docker-php-ext-enable apcu
-RUN pecl install igbinary-3.2.15 && docker-php-ext-enable igbinary
-
-# Configure PHP for Moodle
+# PHP configuration for Moodle
 RUN { \
     echo 'memory_limit = 256M'; \
     echo 'upload_max_filesize = 100M'; \
@@ -99,62 +49,54 @@ RUN { \
     echo 'max_execution_time = 300'; \
     echo 'max_input_vars = 5000'; \
     echo 'file_uploads = On'; \
-    echo 'allow_url_fopen = On'; \
     echo 'session.save_handler = files'; \
-    echo 'session.auto_start = 0'; \
     echo 'display_errors = Off'; \
     echo 'log_errors = On'; \
-    echo 'error_log = /var/log/apache2/php_error.log'; \
 } > /usr/local/etc/php/conf.d/moodle.ini
 
-# Configure OPcache for performance
+# OPcache configuration with JIT
 RUN { \
     echo 'opcache.enable=1'; \
     echo 'opcache.memory_consumption=256'; \
     echo 'opcache.interned_strings_buffer=16'; \
-    echo 'opcache.max_accelerated_files=10000'; \
+    echo 'opcache.max_accelerated_files=20000'; \
     echo 'opcache.revalidate_freq=60'; \
     echo 'opcache.fast_shutdown=1'; \
     echo 'opcache.enable_cli=0'; \
+    echo 'opcache.jit=1255'; \
+    echo 'opcache.jit_buffer_size=128M'; \
 } > /usr/local/etc/php/conf.d/opcache.ini
 
-# Enable Apache modules
-RUN a2enmod rewrite expires headers ssl
-
-# Configure Apache for Moodle
+# PHP-FPM pool configuration
 RUN { \
-    echo '<Directory /var/www/html>'; \
-    echo '    Options -Indexes +FollowSymLinks'; \
-    echo '    AllowOverride All'; \
-    echo '    Require all granted'; \
-    echo '</Directory>'; \
-    echo ''; \
-    echo 'ServerTokens Prod'; \
-    echo 'ServerSignature Off'; \
-} > /etc/apache2/conf-available/moodle.conf && \
-    a2enconf moodle
+    echo '[www]'; \
+    echo 'pm = dynamic'; \
+    echo 'pm.max_children = 50'; \
+    echo 'pm.start_servers = 5'; \
+    echo 'pm.min_spare_servers = 5'; \
+    echo 'pm.max_spare_servers = 35'; \
+    echo 'pm.max_requests = 500'; \
+    echo 'pm.status_path = /status'; \
+    echo 'ping.path = /ping'; \
+    echo 'ping.response = pong'; \
+} > /usr/local/etc/php-fpm.d/zz-moodle.conf
 
-# Create moodledata directory
-RUN mkdir -p /var/moodledata && \
-    chown -R www-data:www-data /var/moodledata && \
-    chmod -R 0750 /var/moodledata
+# PHP-FPM healthcheck script
+RUN echo '#!/bin/sh' > /usr/local/bin/php-fpm-healthcheck \
+    && echo 'SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 | grep -q pong' >> /usr/local/bin/php-fpm-healthcheck \
+    && chmod +x /usr/local/bin/php-fpm-healthcheck
 
-# Set working directory
+# Create directories
+RUN mkdir -p /var/www/html /var/moodledata \
+    && chown -R www-data:www-data /var/www/html /var/moodledata
+
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 WORKDIR /var/www/html
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost/ || exit 1
+EXPOSE 9000
 
-# Run as www-data user (for better security when possible)
-# Note: Apache will still run as root, but app processes run as www-data
-USER www-data
-
-# Expose HTTP and HTTPS ports
-EXPOSE 80 443
-
-# Switch back to root for entrypoint
-USER root
-
-# Start Apache
-CMD ["apache2-foreground"]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["php-fpm"]
