@@ -360,7 +360,7 @@ jobs:
         run: docker build -t moodle-nginx:scan ./docker/nginx
 
       - name: Run Trivy on Moodle image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: 'moodle:scan'
           format: 'table'
@@ -368,7 +368,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Run Trivy on Nginx image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: 'moodle-nginx:scan'
           format: 'table'
