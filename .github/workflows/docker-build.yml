@@ -375,15 +375,14 @@ jobs:
           exit-code: '0'  # Don't fail on vulnerabilities (informational only)
           severity: 'CRITICAL,HIGH'
 
+  # Markdown lint via the org's shared reusable, so the pinned action is
+  # maintained centrally. Scope + blocking behaviour preserved (root *.md,
+  # strict).
   markdown-lint:
     name: Markdown Lint
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-
-      - name: Lint Markdown files
-        uses: DavidAnson/markdownlint-cli2-action@6bf21b07787794f89a243495939cd651942aeabe # v24
-        with:
-          globs: '*.md'
+    uses: netresearch/.github/.github/workflows/lint-markdown.yml@main
+    permissions:
+      contents: read
+    with:
+      globs: '*.md'
+      strict: true
