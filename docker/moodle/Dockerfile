@@ -22,7 +22,7 @@ ARG RUNTIME_DEPS="bash curl git unzip \
 RUN apk add --no-cache $RUNTIME_DEPS $BUILD_DEPS \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-configure ldap \
-    && docker-php-ext-install -j$(nproc) \
+    && docker-php-ext-install -j"$(nproc)" \
         mysqli pdo_mysql \
         pgsql pdo_pgsql \
         gd \

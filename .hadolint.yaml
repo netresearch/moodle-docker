@@ -1,0 +1,4 @@
+ignored:
+  # Alpine's apk repositories serve a single package version at a time, so
+  # pinning every apk package is impractical and churns on every base bump.
+  - DL3018

@@ -69,8 +69,9 @@ download_moodle() {
     local version="$1"
 
     # Extract major.minor for stable branch (e.g., 5.1.2 -> 501)
-    local major=$(echo "$version" | cut -d. -f1)
-    local minor=$(echo "$version" | cut -d. -f2)
+    local major minor
+    major=$(echo "$version" | cut -d. -f1)
+    minor=$(echo "$version" | cut -d. -f2)
     local stable_branch="${major}0${minor}"
 
     log "Downloading Moodle ${version} (stable${stable_branch})..."
@@ -240,5 +241,5 @@ generate_config
 # Fix permissions
 fix_permissions
 
-log "Bootstrap complete, starting: $@"
+log "Bootstrap complete, starting: $*"
 exec "$@"
