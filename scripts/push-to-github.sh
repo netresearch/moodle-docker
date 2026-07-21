@@ -124,9 +124,7 @@ git remote -v
 echo -e "\n${GREEN}Pushing to GitHub...${NC}"
 echo -e "${YELLOW}Note: This requires SSH key access to github.com/netresearch/${NC}\n"
 
-git push -u origin main
-
-if [ $? -eq 0 ]; then
+if git push -u origin main; then
     echo -e "\n${GREEN}=== SUCCESS ===${NC}"
     echo -e "${GREEN}Repository pushed to: https://github.com/${ORG}/${REPO_NAME}${NC}"
     echo -e "\n${YELLOW}Next steps:${NC}"

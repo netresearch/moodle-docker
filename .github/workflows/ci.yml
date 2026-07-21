@@ -1,0 +1,42 @@
+# Adopts the org "Docker Image CI" gold-standard meta for the LINT +
+# SECURITY surface (hadolint, shellcheck, yamllint, compose config-check,
+# a validation-only Trivy build of the primary Moodle image, secret
+# scanning and dependency review).
+#
+# The bespoke two-image build (build-moodle-image + build-nginx-image) and
+# the Test Stack Startup live in docker-build.yml and are intentionally NOT
+# subsumed here: build-container validates ONE image/Dockerfile, so this
+# call points it at the primary Moodle Dockerfile. The nginx Dockerfile and
+# the full stack integration test remain covered by docker-build.yml.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions: {}
+
+jobs:
+  lint-security:
+    name: Lint & Security
+    uses: netresearch/.github/.github/workflows/docker-image-ci.yml@main
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write
+      attestations: write
+      actions: read
+      pull-requests: write
+    with:
+      image-name: moodle
+      dockerfile: ./docker/moodle/Dockerfile
+      context: ./docker/moodle
+      lint-container: true
+      shell-scandirs: "docker scripts"
+      lint-yaml: true
+      lint-compose: true
+      compose-files: "compose.yml"
+    secrets:
+      GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
