@@ -38,5 +38,3 @@ jobs:
       lint-yaml: true
       lint-compose: true
       compose-files: "compose.yml"
-    secrets:
-      GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
