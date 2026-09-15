@@ -5,10 +5,10 @@
 [![Moodle](https://img.shields.io/badge/Moodle-5.2-orange.svg)](https://moodle.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.4-blue.svg)](https://www.php.net/)
 [![nginx](https://img.shields.io/badge/nginx-1.31-green.svg)](https://nginx.org/)
-[![MariaDB](https://img.shields.io/badge/MariaDB-11.8-blue.svg)](https://mariadb.org/)
+[![MariaDB](https://img.shields.io/badge/MariaDB-12.3%20hardened-blue.svg)](https://mariadb.org/)
 [![Valkey](https://img.shields.io/badge/Valkey-9-red.svg)](https://valkey.io/)
 
-Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM), nginx 1.31, MariaDB 11.8, and Valkey 9.
+Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM), nginx 1.31, MariaDB 12.3 (Docker Hardened Image), and Valkey 9.
 
 ## Key Features
 
@@ -42,7 +42,7 @@ Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM),
                               │  └──────┬───────────────────────┬──────────┘  │
                               │         │                       │              │
                               │  ┌──────┴──────┐         ┌──────┴──────┐      │
-                              │  │ MariaDB 11.8│         │  Valkey 9   │      │
+                              │  │ MariaDB 12.3│         │  Valkey 9   │      │
                               │  │  Database   │         │  Sessions   │      │
                               │  │             │         │  + Cache    │      │
                               │  └─────────────┘         └─────────────┘      │
@@ -64,7 +64,7 @@ Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM),
 |-----------|---------|-------------|
 | **nginx** | 1.31 | Web server with HTTP/2, HTTP/3 (QUIC), Brotli compression |
 | **PHP-FPM** | 8.4 | PHP runtime with OPcache JIT, Redis, igbinary, APCu |
-| **MariaDB** | 11.8 LTS | Database server with optimized InnoDB configuration |
+| **MariaDB** | 12.3 (hardened) | Docker Hardened Image, runs non-root (uid 65532) |
 | **Valkey** | 9 | Redis-compatible server for sessions and cache |
 | **Ofelia** | 1.0.0 (netresearch) | Docker-native cron scheduler for Moodle tasks |
 | **Mailpit** | v1.31.1 | Development mail catcher (optional, `dev` profile) |
@@ -72,7 +72,8 @@ Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM),
 ## Prerequisites
 
 - Docker Engine 24.0+
-- Docker Compose V2.20+
+- A Docker Compose release that supports the `pre_start` lifecycle hook
+- Access to `dhi.io` for the hardened MariaDB image (`docker login dhi.io`)
 - 4GB+ RAM (8GB+ recommended for production)
 - 20GB+ disk space
 

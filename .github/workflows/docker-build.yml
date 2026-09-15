@@ -249,6 +249,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      # The hardened MariaDB image lives on dhi.io, which needs a login. Without
+      # the secrets the pull fails, so fail here with a clear message rather
+      # than inside `compose up`, where it reads as an unhealthy container.
+      - name: Check dhi.io credentials
+        run: |
+          if [ -z "${{ secrets.DHI_USERNAME }}" ] || [ -z "${{ secrets.DHI_TOKEN }}" ]; then
+            echo "::error::Repository secrets DHI_USERNAME and DHI_TOKEN are required to pull dhi.io/mariadb"
+            exit 1
+          fi
+
+      - name: Log in to dhi.io
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DHI_USERNAME }}
+          password: ${{ secrets.DHI_TOKEN }}
+
       - name: Create .env file
         run: |
           cp .env.example .env

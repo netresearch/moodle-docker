@@ -1,4 +1,4 @@
-# MariaDB 11 Custom Configuration for Moodle
+# MariaDB Custom Configuration for Moodle
 # Optimized for production use
 
 [mysqld]
@@ -53,8 +53,10 @@ query_cache_size = 0
 # ============================================================================
 # Logging
 # ============================================================================
-# Error log
-log_error = /var/log/mysql/error.log
+# Errors go to stderr so `docker compose logs database` shows them. Do not set
+# log_error to a file: the hardened image has no /var/log/mysql and runs as a
+# non-root user, so the server would report it cannot create the file on every
+# start.
 
 # Slow query log (optional - enable for performance tuning)
 # slow_query_log = 1

@@ -1,5 +1,5 @@
 # Moodle 5.2 Production Stack
-# PHP-FPM + nginx + MariaDB 11.8 + Valkey 9 + Ofelia + Mailpit
+# PHP-FPM + nginx + MariaDB 12.3 (hardened) + Valkey 9 + Ofelia + Mailpit
 
 services:
   # ==========================================================================
@@ -72,6 +72,28 @@ services:
         condition: service_healthy
       valkey:
         condition: service_healthy
+    # Init container: the hardened database image acts on MARIADB_ROOT_PASSWORD
+    # only and creates neither database nor user. This runs once before the
+    # service starts, in the database image because the PHP image has no client.
+    # Idempotent, so repeated starts are harmless.
+    pre_start:
+      - image: dhi.io/mariadb:12.3
+        environment:
+          - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
+          - DB_NAME=${DB_NAME:-moodle}
+          - DB_USER=${DB_USER:-moodle}
+          - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            mariadb -h database -u root -p"$$MARIADB_ROOT_PASSWORD" \
+              -e "CREATE DATABASE IF NOT EXISTS \`$$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+                  CREATE USER IF NOT EXISTS '$$DB_USER'@'%' IDENTIFIED BY '$$DB_PASSWORD';
+                  ALTER USER '$$DB_USER'@'%' IDENTIFIED BY '$$DB_PASSWORD';
+                  GRANT ALL PRIVILEGES ON \`$$DB_NAME\`.* TO '$$DB_USER'@'%';
+                  FLUSH PRIVILEGES;"
+            echo "database and user ready"
     healthcheck:
       test: ["CMD", "php-fpm-healthcheck"]
       interval: 30s
@@ -118,20 +140,22 @@ services:
       ofelia.job-exec.moodle-cron.user: "www-data"
 
   # ==========================================================================
-  # MariaDB 11.8 LTS - Database
+  # MariaDB 12.3 - Database (Docker Hardened Image)
+  #
+  # The hardened image runs as non-root (uid 65532) and ships no my.cnf, so the
+  # tuning file is mounted at /etc/my.cnf - the first path the server reads.
+  # There is no conf.d include, and it honours only MARIADB_ROOT_PASSWORD; it
+  # creates neither database nor user, which db-init below does instead.
   # ==========================================================================
   database:
-    image: mariadb:11.8
+    image: dhi.io/mariadb:12.3
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_database
     restart: unless-stopped
     volumes:
       - db_data:/var/lib/mysql
-      - ./docker/mariadb/custom.cnf:/etc/mysql/conf.d/custom.cnf:ro
+      - ./docker/mariadb/custom.cnf:/etc/my.cnf:ro
     environment:
-      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
-      - MYSQL_DATABASE=${DB_NAME:-moodle}
-      - MYSQL_USER=${DB_USER:-moodle}
-      - MYSQL_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
     networks:
       - backend
     healthcheck:
