@@ -19,7 +19,8 @@ nginx 1.31, MariaDB 12.3 (Docker Hardened Image), and Valkey 9.
 - **Modern Web Stack**: PHP-FPM + nginx architecture (no mod_php)
 - **HTTP/2 and HTTP/3 (QUIC)**: Modern protocol support out of the box
 - **Brotli Compression**: Better compression than gzip for modern browsers
-- **Dedicated Cron Container**: Isolated cron execution via Ofelia scheduler
+- **Scheduled Cron**: Ofelia runs Moodle cron in the application container
+  on a one-minute schedule
 - **Redis Sessions**: Valkey-backed session storage for scalability
 
 ## Architecture
@@ -50,8 +51,8 @@ nginx 1.31, MariaDB 12.3 (Docker Hardened Image), and Valkey 9.
                               │  └─────────────┘         └─────────────┘      │
                               │                                                 │
                               │  ┌─────────────┐         ┌─────────────┐      │
-                              │  │ Moodle Cron │◄────────│   Ofelia    │      │
-                              │  │ (PHP-FPM)   │  exec   │  Scheduler  │      │
+                              │  │  Moodle App │◄────────│   Ofelia    │      │
+                              │  │  (cron job) │  exec   │  Scheduler  │      │
                               │  └─────────────┘         └─────────────┘      │
                               │                                                 │
                               │  ┌─────────────┐  (optional, dev profile)     │
@@ -218,7 +219,7 @@ docker compose exec moodle php /var/www/html/admin/cli/maintenance.php --enable
 docker compose exec database mysqldump -uroot -p"$DB_ROOT_PASSWORD" moodle | gzip > backup-$(date +%Y%m%d).sql.gz
 
 # Rebuild the image with the new version, then restart
-docker compose build moodle moodle-cron
+docker compose build moodle
 docker compose up -d moodle
 
 # Watch the upgrade
@@ -362,8 +363,8 @@ docker compose run --rm --no-deps --entrypoint cat moodle /var/www/html/.moodle-
 # On a mismatch, set MOODLE_VERSION in .env, then rebuild and restart.
 # Compose passes that value as the build argument, so do not pass it again
 # here - a divergence between the two is what caused the mismatch.
-docker compose build moodle moodle-cron
-docker compose up -d moodle moodle-cron
+docker compose build moodle
+docker compose up -d moodle
 ```
 
 ### PHP-FPM Health Check Fails
@@ -404,10 +405,10 @@ docker compose exec moodle chmod -R 0775 /var/moodledata
 docker compose logs ofelia
 
 # Check cron container
-docker compose logs moodle-cron
+docker compose logs ofelia
 
 # Run cron manually
-docker compose exec moodle-cron php /var/www/html/admin/cli/cron.php
+docker compose exec -u www-data moodle php /var/www/html/admin/cli/cron.php
 ```
 
 ## Security Notes

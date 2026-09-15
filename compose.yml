@@ -68,54 +68,58 @@ services:
       - frontend  # Outbound access for Moodle itself (plugin updates, external services)
       - backend
     depends_on:
-      db-init:
-        condition: service_completed_successfully
+      database:
+        condition: service_healthy
       valkey:
         condition: service_healthy
+    # Init container: the hardened database image acts on MARIADB_ROOT_PASSWORD
+    # only and creates neither database nor user, and it offers no
+    # /docker-entrypoint-initdb.d. This runs once before the service starts,
+    # in the database image because the PHP image carries no client.
+    # Idempotent, so repeated starts are harmless.
+    pre_start:
+      - image: dhi.io/mariadb:12.3
+        environment:
+          - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
+          - DB_NAME=${DB_NAME:-moodle}
+          - DB_USER=${DB_USER:-moodle}
+          - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            set -eu
+            # Identifiers cannot be parameterised, so reject anything that would
+            # break out of the quoting instead of interpolating it blindly.
+            case "$$DB_NAME$$DB_USER" in
+              *[!A-Za-z0-9_-]*) echo "DB_NAME and DB_USER may only contain A-Z a-z 0-9 _ -" >&2; exit 1 ;;
+            esac
+            # Single quotes are the only metacharacter inside a SQL string literal.
+            esc_pw=$$(printf '%s' "$$DB_PASSWORD" | sed "s/'/''/g")
+            mariadb -h database -u root -p"$$MARIADB_ROOT_PASSWORD" \
+              -e "CREATE DATABASE IF NOT EXISTS \`$$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+                  CREATE USER IF NOT EXISTS '$$DB_USER'@'%' IDENTIFIED BY '$$esc_pw';
+                  ALTER USER '$$DB_USER'@'%' IDENTIFIED BY '$$esc_pw';
+                  GRANT ALL PRIVILEGES ON \`$$DB_NAME\`.* TO '$$DB_USER'@'%';
+                  FLUSH PRIVILEGES;"
+            echo "database and user ready"
+    # Cron runs in this container rather than a dedicated one. Ofelia's
+    # job-exec needs a running container, and this one runs anyway; a separate
+    # service would have to sit in `sleep infinity` doing nothing. job-run
+    # would avoid the idle container too, but it needs every volume, network
+    # and environment variable repeated in labels - a second copy of the
+    # service definition that drifts.
+    labels:
+      ofelia.enabled: "true"
+      ofelia.job-exec.moodle-cron.schedule: "@every 1m"
+      ofelia.job-exec.moodle-cron.command: "php /var/www/html/admin/cli/cron.php"
+      ofelia.job-exec.moodle-cron.user: "www-data"
     healthcheck:
       test: ["CMD", "php-fpm-healthcheck"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 120s  # Allow time for the first copy into the code volume
-
-  # ==========================================================================
-  # Moodle Cron - Dedicated Container for Scheduled Tasks
-  # ==========================================================================
-  moodle-cron:
-    image: netresearch/moodle:${MOODLE_VERSION:-5.2.3}
-    build:
-      context: ./docker/moodle
-      dockerfile: Dockerfile
-      args:
-        MOODLE_VERSION: ${MOODLE_VERSION:-5.2.3}
-    container_name: ${COMPOSE_PROJECT_NAME:-moodle}_cron
-    restart: unless-stopped
-    command: ["sleep", "infinity"]
-    volumes:
-      - moodle_code:/var/www/html:ro
-      - moodledata:/var/moodledata
-    environment:
-      - MOODLE_SKIP_BOOTSTRAP=true
-      - DB_TYPE=${DB_TYPE:-mariadb}
-      - DB_HOST=${DB_HOST:-database}
-      - DB_NAME=${DB_NAME:-moodle}
-      - DB_USER=${DB_USER:-moodle}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_PREFIX=${DB_PREFIX:-mdl_}
-      - VALKEY_HOST=${VALKEY_HOST:-valkey}
-      - VALKEY_PORT=${VALKEY_PORT:-6379}
-      - VALKEY_PASSWORD=${VALKEY_PASSWORD}
-    networks:
-      - backend
-    depends_on:
-      moodle:
-        condition: service_healthy
-    labels:
-      ofelia.enabled: "true"
-      ofelia.job-exec.moodle-cron.schedule: "@every 1m"
-      ofelia.job-exec.moodle-cron.command: "php /var/www/html/admin/cli/cron.php"
-      ofelia.job-exec.moodle-cron.user: "www-data"
 
   # ==========================================================================
   # MariaDB 12.3 - Database (Docker Hardened Image)
@@ -142,50 +146,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-
-  # ==========================================================================
-  # Database bootstrap - creates the Moodle database and user
-  #
-  # The hardened image acts on MARIADB_ROOT_PASSWORD only: it creates neither
-  # database nor user, and offers no /docker-entrypoint-initdb.d. This runs
-  # once and exits. Idempotent, so repeated starts are harmless.
-  #
-  # Compose models init containers as pre_start hooks, which would be the
-  # tidier form, but the compose version on the CI runners (v2.38) rejects
-  # pre_start outright. A one-shot service works on every version.
-  # ==========================================================================
-  db-init:
-    image: dhi.io/mariadb:12.3
-    container_name: ${COMPOSE_PROJECT_NAME:-moodle}_db_init
-    restart: "no"
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        set -eu
-        # Identifiers cannot be parameterised, so reject anything that would
-        # break out of the quoting instead of interpolating it blindly.
-        case "$$DB_NAME$$DB_USER" in
-          *[!A-Za-z0-9_-]*) echo "DB_NAME and DB_USER may only contain A-Z a-z 0-9 _ -" >&2; exit 1 ;;
-        esac
-        # Single quotes are the only metacharacter inside a SQL string literal.
-        esc_pw=$$(printf '%s' "$$DB_PASSWORD" | sed "s/'/''/g")
-        mariadb -h database -u root -p"$$MARIADB_ROOT_PASSWORD" \
-          -e "CREATE DATABASE IF NOT EXISTS \`$$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-              CREATE USER IF NOT EXISTS '$$DB_USER'@'%' IDENTIFIED BY '$$esc_pw';
-              ALTER USER '$$DB_USER'@'%' IDENTIFIED BY '$$esc_pw';
-              GRANT ALL PRIVILEGES ON \`$$DB_NAME\`.* TO '$$DB_USER'@'%';
-              FLUSH PRIVILEGES;"
-        echo "database and user ready"
-    environment:
-      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
-      - DB_NAME=${DB_NAME:-moodle}
-      - DB_USER=${DB_USER:-moodle}
-      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
-    networks:
-      - backend
-    depends_on:
-      database:
-        condition: service_healthy
 
   # ==========================================================================
   # Valkey 9 - Redis-Compatible Cache & Sessions
@@ -223,7 +183,7 @@ services:
     networks:
       - backend
     depends_on:
-      - moodle-cron
+      - moodle
 
   # ==========================================================================
   # Mailpit - Development Mail Catcher (Optional)

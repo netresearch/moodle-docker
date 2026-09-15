@@ -89,7 +89,7 @@ To upgrade to a new Moodle version:
 2. Rebuild the image and restart the stack. The sources ship inside the image,
    so a rebuild is required — without it the container refuses to start:
    ```bash
-   docker compose build moodle moodle-cron
+   docker compose build moodle
    docker compose up -d
    ```
 
