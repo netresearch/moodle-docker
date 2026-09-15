@@ -170,17 +170,22 @@ To upgrade to a new Moodle version:
 
 ### 1. Check Available Versions
 
-Visit https://download.moodle.org/releases/latest/ to see available versions.
+Visit https://download.moodle.org/releases/latest/ to see available versions. The
+image is built from the matching Git tag at https://github.com/moodle/moodle/tags.
 
 ### 2. Update Environment Variable
 
 ```bash
 # Edit .env and change MOODLE_VERSION
 nano .env
-# Change: MOODLE_VERSION=5.1.3  (or desired version)
+# Change: MOODLE_VERSION=5.2.4  (or desired version)
 ```
 
-### 3. Restart the Stack
+### 3. Rebuild and Restart the Stack
+
+The sources ship inside the image, so the new version needs a rebuild — changing
+`MOODLE_VERSION` alone makes the container refuse to start rather than serve a
+version that is not there.
 
 ```bash
 # Enable maintenance mode first
@@ -189,7 +194,8 @@ docker compose exec moodle php /var/www/html/admin/cli/maintenance.php --enable
 # Backup database (recommended)
 docker compose exec database mysqldump -uroot -p"$DB_ROOT_PASSWORD" moodle | gzip > backup-$(date +%Y%m%d).sql.gz
 
-# Restart to trigger download of new version
+# Rebuild the image with the new version, then restart
+docker compose build moodle moodle-cron
 docker compose up -d moodle
 
 # Watch the upgrade
@@ -312,17 +318,23 @@ moodle-docker/
 
 ## Troubleshooting
 
-### Moodle Download Fails
+### Moodle Sources Missing or Version Mismatch
+
+The sources are baked into the image, so a failed fetch shows up as a build
+failure, not as a container that never becomes healthy.
 
 ```bash
 # Check container logs
 docker compose logs moodle
 
-# Verify internet connectivity from container
-docker compose exec moodle curl -I https://download.moodle.org
+# Which version does the image carry?
+docker compose exec moodle cat /opt/moodle-dist/.moodle-version
 
-# Manual download URL test
-docker compose exec moodle curl -fSL "https://download.moodle.org/download.php/direct/stable501/moodle-5.1.2.tgz" -o /tmp/test.tgz
+# Which version is installed in the code volume?
+docker compose exec moodle cat /var/www/html/.moodle-version
+
+# On a mismatch, rebuild the image for the version you want
+docker compose build --build-arg MOODLE_VERSION=5.2.3 moodle moodle-cron
 ```
 
 ### PHP-FPM Health Check Fails

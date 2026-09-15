@@ -1,4 +1,4 @@
-# Moodle 5.1 Production Stack
+# Moodle 5.2 Production Stack
 # PHP-FPM + nginx + MariaDB 11.8 + Valkey 9 + Ofelia + Mailpit
 
 services:
@@ -36,17 +36,19 @@ services:
   # Moodle - PHP-FPM Application
   # ==========================================================================
   moodle:
-    image: netresearch/moodle:${MOODLE_VERSION:-5.1}
+    image: netresearch/moodle:${MOODLE_VERSION:-5.2.3}
     build:
       context: ./docker/moodle
       dockerfile: Dockerfile
+      args:
+        MOODLE_VERSION: ${MOODLE_VERSION:-5.2.3}
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_app
     restart: unless-stopped
     volumes:
       - moodle_code:/var/www/html
       - moodledata:/var/moodledata
     environment:
-      - MOODLE_VERSION=${MOODLE_VERSION:-5.1.2}
+      - MOODLE_VERSION=${MOODLE_VERSION:-5.2.3}
       - MOODLE_URL=${MOODLE_URL:-http://localhost}
       - DB_TYPE=${DB_TYPE:-mariadb}
       - DB_HOST=${DB_HOST:-database}
@@ -81,10 +83,12 @@ services:
   # Moodle Cron - Dedicated Container for Scheduled Tasks
   # ==========================================================================
   moodle-cron:
-    image: netresearch/moodle:${MOODLE_VERSION:-5.1}
+    image: netresearch/moodle:${MOODLE_VERSION:-5.2.3}
     build:
       context: ./docker/moodle
       dockerfile: Dockerfile
+      args:
+        MOODLE_VERSION: ${MOODLE_VERSION:-5.2.3}
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_cron
     restart: unless-stopped
     command: ["sleep", "infinity"]

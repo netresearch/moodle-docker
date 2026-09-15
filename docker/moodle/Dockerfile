@@ -42,6 +42,24 @@ RUN apk add --no-cache $RUNTIME_DEPS $BUILD_DEPS \
     && apk del $BUILD_DEPS \
     && rm -rf /tmp/* /var/cache/apk/*
 
+# Moodle sources, baked into the image
+#
+# Fetched from the upstream Git tag rather than from download.moodle.org: the
+# tag is immutable, and codeload.github.com is reachable from CI runners while
+# download.moodle.org answers them with 403 (issue #74). Fetching at build time
+# rather than at container start also turns a failed fetch into a build failure
+# instead of a container that never becomes healthy.
+ARG MOODLE_VERSION=5.2.3
+ENV MOODLE_VERSION=${MOODLE_VERSION}
+
+RUN mkdir -p /opt/moodle-dist \
+    && curl -fSL "https://github.com/moodle/moodle/archive/refs/tags/v${MOODLE_VERSION}.tar.gz" \
+        -o /tmp/moodle.tar.gz \
+    && tar -xzf /tmp/moodle.tar.gz -C /opt/moodle-dist --strip-components=1 \
+    && rm -f /tmp/moodle.tar.gz \
+    && grep -q "release  = '${MOODLE_VERSION}" /opt/moodle-dist/public/version.php \
+    && echo "${MOODLE_VERSION}" > /opt/moodle-dist/.moodle-version
+
 # PHP configuration for Moodle
 RUN { \
     echo 'memory_limit = 256M'; \

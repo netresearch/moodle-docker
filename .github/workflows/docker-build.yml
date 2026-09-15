@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  MOODLE_VERSION: "5.1.1"
+  MOODLE_VERSION: "5.2.3"
 
 jobs:
   validate-compose:
@@ -273,7 +273,8 @@ jobs:
       - name: Wait for services to be healthy
         run: |
           echo "Waiting for services to be healthy..."
-          # Longer timeout for Moodle 5.1 (runtime download takes time)
+          # The sources ship in the image, so startup only copies them into the
+          # code volume - no download to wait for.
           timeout 300 bash -c 'until docker compose ps moodle | grep -q "healthy"; do sleep 10; echo "Waiting..."; docker compose ps; done'
           docker compose ps
           echo "Services are healthy"
