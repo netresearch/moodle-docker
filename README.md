@@ -91,33 +91,46 @@ cd moodle-docker
 ### 2. Configure Environment
 
 ```bash
-# Copy the example environment file
-cp .env.example .env
-
-# Generate secure passwords (or use your own)
-sed -i "s/CHANGE_ME_SECURE_PASSWORD/$(openssl rand -base64 24)/" .env
-sed -i "s/CHANGE_ME_SECURE_ROOT_PASSWORD/$(openssl rand -base64 24)/" .env
-sed -i "s/CHANGE_ME_SECURE_VALKEY_PASSWORD/$(openssl rand -base64 24)/" .env
+# Creates .env with three random passwords and a self-signed TLS certificate
+make setup
 
 # Review and customize
 nano .env
+```
+
+nginx listens on 443 and will not start without `docker/nginx/ssl/cert.pem` and `key.pem`, which is what `make setup`
+creates (`make certs` on its own does the same). Replace them with real certificates for production, or put the stack
+behind Traefik, which terminates TLS itself.
+
+To do it by hand instead, copy `.env.example` to `.env` and replace the three `CHANGE_ME_...` placeholders. Generate
+the values from the alphanumeric alphabet — a `base64` password can contain `/`, which breaks the `sed` that inserts
+it:
+
+```bash
+LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32
 ```
 
 ### 3. Start the Stack
 
 ```bash
 # Start all services
-docker compose up -d
+make start          # or: docker compose up -d
 
 # Watch the logs (first start copies the sources into the code volume)
 docker compose logs -f moodle
 ```
 
-### 4. Access Moodle
+### 4. Create the Moodle Database
 
-- **Web UI**: http://localhost (or https://localhost with self-signed cert warning)
-- **First run**: Complete the Moodle installation wizard
-- **Database settings**: Pre-filled from environment variables
+The stack brings up an empty database. Create the site once, then sign in as `admin`:
+
+```bash
+make install ADMIN_PASS='<password>' ADMIN_EMAIL='<address>'
+```
+
+### 5. Access Moodle
+
+- **Web UI**: http://localhost (or https://localhost with a self-signed certificate warning)
 
 ## Environment Variables
 
@@ -225,21 +238,19 @@ docker compose exec database mysqldump -uroot -p"$DB_ROOT_PASSWORD" moodle | gzi
 docker compose build moodle
 docker compose up -d moodle
 
-# Watch the upgrade
+# Watch the upgrade - the entrypoint runs the database upgrade itself
 docker compose logs -f moodle
-
-# Run database upgrade
-docker compose exec moodle php /var/www/html/admin/cli/upgrade.php --non-interactive
 
 # Disable maintenance mode
 docker compose exec moodle php /var/www/html/admin/cli/maintenance.php --disable
 ```
 
-The entrypoint script automatically:
-- Detects the version change
-- Downloads the new Moodle version
-- Preserves any custom plugins you've installed
-- Regenerates `config.php`
+The entrypoint:
+- refuses to start when `MOODLE_VERSION` and the version in the image disagree
+- copies the new sources out of the image into the code volume
+- preserves any custom plugins you have installed
+- regenerates `config.php`
+- runs `admin/cli/upgrade.php` unless `MOODLE_AUTO_UPGRADE=false`
 
 ## Development
 
@@ -354,10 +365,8 @@ moodle-docker/
 │   │   ├── Dockerfile          # nginx with Brotli modules
 │   │   ├── nginx.conf          # nginx configuration
 │   │   └── ssl/                # SSL certificates (mount your own for prod)
-│   ├── mariadb/
-│   │   └── custom.cnf          # MariaDB optimization settings
-│   └── valkey/
-│       └── valkey.conf         # Valkey configuration
+│   └── mariadb/
+│       └── custom.cnf          # MariaDB optimization settings
 ├── compose.yml                 # Main Docker Compose configuration
 ├── compose.traefik.yml         # Traefik overlay for production
 ├── .env.example                # Environment template
@@ -442,10 +451,7 @@ docker compose exec moodle chmod -R 0775 /var/moodledata
 ### Cron Not Running
 
 ```bash
-# Check Ofelia logs
-docker compose logs ofelia
-
-# Check cron container
+# Check Ofelia logs - it is the scheduler and runs cron inside the moodle container
 docker compose logs ofelia
 
 # Run cron manually
@@ -509,7 +515,7 @@ worker_connections 4096;
 
 ## Support & Documentation
 
-- **Moodle Documentation**: https://docs.moodle.org/501/en/
+- **Moodle Documentation**: https://docs.moodle.org/502/en/
 - **Moodle Forums**: https://moodle.org/forums/
 - **Docker Documentation**: https://docs.docker.com/
 - **Valkey Documentation**: https://valkey.io/docs/
