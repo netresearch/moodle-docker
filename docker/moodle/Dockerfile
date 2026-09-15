@@ -69,6 +69,17 @@ RUN git clone --depth 1 --branch "v${MOODLE_VERSION}" \
     && grep -q "release  = '${MOODLE_VERSION}" /opt/moodle-dist/public/version.php \
     && echo "${MOODLE_VERSION}" > /opt/moodle-dist/.moodle-version
 
+# Moodle ships a composer manifest and reports "Composer installed data not
+# found" in its environment check without the resulting vendor/ directory. The
+# official tarball carries it prebuilt; a git checkout does not, so it is
+# built here.
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+WORKDIR /opt/moodle-dist
+RUN composer install --no-dev --classmap-authoritative --no-interaction --no-progress \
+    && test -d /opt/moodle-dist/vendor \
+    && rm -rf /root/.composer /usr/local/bin/composer
+WORKDIR /
+
 # PHP configuration for Moodle
 RUN { \
     echo 'memory_limit = 256M'; \
@@ -79,6 +90,7 @@ RUN { \
     echo 'file_uploads = On'; \
     echo 'session.save_handler = files'; \
     echo 'display_errors = Off'; \
+    echo 'zend.exception_ignore_args = On'; \
     echo 'log_errors = On'; \
 } > /usr/local/etc/php/conf.d/moodle.ini
 

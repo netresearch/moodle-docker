@@ -129,7 +129,8 @@ All configuration is done via environment variables in `.env`:
 |----------|---------|-------------|
 | `MOODLE_VERSION` | `5.2.3` | Moodle version baked into the image; changing it needs a rebuild |
 | `MOODLE_URL` | `http://localhost` | Full URL to your Moodle site (no trailing slash) |
-| `SSL_PROXY` | `false` | Set to `true` if behind SSL-terminating proxy |
+| `SSL_PROXY` | `false` | Set to `true` behind an SSL-terminating proxy; sets `$CFG->sslproxy` |
+| `REVERSE_PROXY` | `false` | Sets `$CFG->reverseproxy` for advanced load balancing or port forwarding; leave off for a plain TLS terminator |
 | `MOODLE_DEBUG` | `false` | Enable Moodle debug mode for development |
 
 ### Database Settings
@@ -301,6 +302,17 @@ docker compose -f compose.yml -f compose.traefik.yml up -d
 
 See `compose.traefik.yml` for Traefik labels configuration.
 
+`SSL_PROXY` and `REVERSE_PROXY` are different switches and a TLS terminator needs only the first.
+`$CFG->reverseproxy` makes Moodle compare every request against `wwwroot` and abort with `reverseproxyabused`
+when they differ, which is what Traefik in front of the same host produces. Turn `REVERSE_PROXY=true` on only
+for the advanced load balancing and port forwarding cases Moodle's `config-dist.php` describes.
+
+The Traefik overlay drops the published host ports (`ports: !reset []`), so nginx is then reachable through
+Traefik alone. That matters because nginx trusts `X-Forwarded-Proto` to decide the scheme it reports to PHP:
+behind Traefik the header is set by Traefik on every request, while the base stack publishes port 80 and
+anyone reaching it directly can declare any scheme. Do not publish those ports on a host that also sits behind
+a proxy.
+
 ## File Structure
 
 ```
@@ -417,7 +429,8 @@ docker compose exec -u www-data moodle php /var/www/html/admin/cli/cron.php
 2. Never commit `.env` to version control
 3. Use strong passwords (24+ characters recommended)
 4. For production, mount real SSL certificates instead of self-signed
-5. Set `SSL_PROXY=true` when behind Traefik or other SSL-terminating proxy
+5. Set `SSL_PROXY=true` when behind Traefik or other SSL-terminating proxy, and keep `REVERSE_PROXY=false`
+   unless you really run the advanced setup it is meant for
 6. The backend network is isolated (`internal: true`) - only nginx has external access
 7. Keep images updated: `docker compose pull && docker compose up -d`
 
