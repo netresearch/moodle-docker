@@ -12,7 +12,7 @@ Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM),
 
 ## Key Features
 
-- **Runtime Moodle Download**: Moodle is downloaded at container startup, not baked into the image
+- **Sources in the Image**: Moodle is fetched at build time and pinned to an upstream commit, not downloaded at container startup
 - **Environment-Driven Config**: `config.php` is generated from environment variables
 - **Modern Web Stack**: PHP-FPM + nginx architecture (no mod_php)
 - **HTTP/2 and HTTP/3 (QUIC)**: Modern protocol support out of the box
@@ -37,7 +37,7 @@ Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM),
                               │                     ▼                           │
                               │  ┌──────────────────────────────────────────┐  │
                               │  │              PHP 8.4 FPM                 │  │
-                              │  │   Moodle App (downloaded at runtime)    │  │
+                              │  │   Moodle App (baked into the image)     │  │
                               │  │   OPcache + JIT + Redis extension       │  │
                               │  └──────┬───────────────────────┬──────────┘  │
                               │         │                       │              │
@@ -66,7 +66,7 @@ Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM),
 | **PHP-FPM** | 8.4 | PHP runtime with OPcache JIT, Redis, igbinary, APCu |
 | **MariaDB** | 11.8 LTS | Database server with optimized InnoDB configuration |
 | **Valkey** | 9 | Redis-compatible server for sessions and cache |
-| **Ofelia** | 0.3.22 | Docker-native cron scheduler for Moodle tasks |
+| **Ofelia** | 1.0.0 (netresearch) | Docker-native cron scheduler for Moodle tasks |
 | **Mailpit** | v1.31.1 | Development mail catcher (optional, `dev` profile) |
 
 ## Prerequisites
@@ -106,7 +106,7 @@ nano .env
 # Start all services
 docker compose up -d
 
-# Watch the logs (Moodle download takes 1-2 minutes on first start)
+# Watch the logs (first start copies the sources into the code volume)
 docker compose logs -f moodle
 ```
 
@@ -320,7 +320,7 @@ moodle-docker/
 
 | Volume | Purpose |
 |--------|---------|
-| `moodle_code` | Moodle PHP source code (downloaded at runtime) |
+| `moodle_code` | Moodle PHP source code (copied from the image on first start) |
 | `moodledata` | User files, cache, temp files |
 | `db_data` | MariaDB database files |
 | `valkey_data` | Valkey persistence (AOF) |

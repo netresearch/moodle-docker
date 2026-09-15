@@ -52,8 +52,8 @@ VALKEY_PASSWORD=<secure-password>
 docker compose up -d
 ```
 
-> **Note:** First startup downloads Moodle (~200MB) and may take a few minutes.
-> Watch progress with: `docker compose logs -f moodle`
+> **Note:** The sources ship in the image; first startup only copies them into
+> the code volume. Watch progress with: `docker compose logs -f moodle`
 
 ### 4. Access Moodle
 

@@ -65,7 +65,7 @@ services:
       - SSL_PROXY=${SSL_PROXY:-false}
       - MOODLE_DEBUG=${MOODLE_DEBUG:-false}
     networks:
-      - frontend  # Needs internet access for Moodle download
+      - frontend  # Outbound access for Moodle itself (plugin updates, external services)
       - backend
     depends_on:
       database:
@@ -77,7 +77,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 120s  # Allow time for Moodle download
+      start_period: 120s  # Allow time for the first copy into the code volume
 
   # ==========================================================================
   # Moodle Cron - Dedicated Container for Scheduled Tasks
@@ -168,10 +168,10 @@ services:
   # Ofelia - Cron Scheduler
   # ==========================================================================
   ofelia:
-    image: mcuadros/ofelia:0.3.22
+    image: ghcr.io/netresearch/ofelia:1.0.0
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_ofelia
     restart: unless-stopped
-    command: daemon --docker
+    command: daemon
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
