@@ -68,32 +68,10 @@ services:
       - frontend  # Outbound access for Moodle itself (plugin updates, external services)
       - backend
     depends_on:
-      database:
-        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
       valkey:
         condition: service_healthy
-    # Init container: the hardened database image acts on MARIADB_ROOT_PASSWORD
-    # only and creates neither database nor user. This runs once before the
-    # service starts, in the database image because the PHP image has no client.
-    # Idempotent, so repeated starts are harmless.
-    pre_start:
-      - image: dhi.io/mariadb:12.3
-        environment:
-          - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
-          - DB_NAME=${DB_NAME:-moodle}
-          - DB_USER=${DB_USER:-moodle}
-          - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
-        command:
-          - /bin/sh
-          - -c
-          - |
-            mariadb -h database -u root -p"$$MARIADB_ROOT_PASSWORD" \
-              -e "CREATE DATABASE IF NOT EXISTS \`$$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-                  CREATE USER IF NOT EXISTS '$$DB_USER'@'%' IDENTIFIED BY '$$DB_PASSWORD';
-                  ALTER USER '$$DB_USER'@'%' IDENTIFIED BY '$$DB_PASSWORD';
-                  GRANT ALL PRIVILEGES ON \`$$DB_NAME\`.* TO '$$DB_USER'@'%';
-                  FLUSH PRIVILEGES;"
-            echo "database and user ready"
     healthcheck:
       test: ["CMD", "php-fpm-healthcheck"]
       interval: 30s
@@ -164,6 +142,43 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # ==========================================================================
+  # Database bootstrap - creates the Moodle database and user
+  #
+  # The hardened image acts on MARIADB_ROOT_PASSWORD only: it creates neither
+  # database nor user, and offers no /docker-entrypoint-initdb.d. This runs
+  # once and exits. Idempotent, so repeated starts are harmless.
+  #
+  # Compose models init containers as pre_start hooks, which would be the
+  # tidier form, but the compose version on the CI runners (v2.38) rejects
+  # pre_start outright. A one-shot service works on every version.
+  # ==========================================================================
+  db-init:
+    image: dhi.io/mariadb:12.3
+    container_name: ${COMPOSE_PROJECT_NAME:-moodle}_db_init
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mariadb -h database -u root -p"$$MARIADB_ROOT_PASSWORD" \
+          -e "CREATE DATABASE IF NOT EXISTS \`$$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+              CREATE USER IF NOT EXISTS '$$DB_USER'@'%' IDENTIFIED BY '$$DB_PASSWORD';
+              ALTER USER '$$DB_USER'@'%' IDENTIFIED BY '$$DB_PASSWORD';
+              GRANT ALL PRIVILEGES ON \`$$DB_NAME\`.* TO '$$DB_USER'@'%';
+              FLUSH PRIVILEGES;"
+        echo "database and user ready"
+    environment:
+      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
+      - DB_NAME=${DB_NAME:-moodle}
+      - DB_USER=${DB_USER:-moodle}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+    networks:
+      - backend
+    depends_on:
+      database:
+        condition: service_healthy
 
   # ==========================================================================
   # Valkey 9 - Redis-Compatible Cache & Sessions

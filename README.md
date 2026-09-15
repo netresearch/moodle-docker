@@ -8,11 +8,13 @@
 [![MariaDB](https://img.shields.io/badge/MariaDB-12.3%20hardened-blue.svg)](https://mariadb.org/)
 [![Valkey](https://img.shields.io/badge/Valkey-9-red.svg)](https://valkey.io/)
 
-Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM), nginx 1.31, MariaDB 12.3 (Docker Hardened Image), and Valkey 9.
+Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM),
+nginx 1.31, MariaDB 12.3 (Docker Hardened Image), and Valkey 9.
 
 ## Key Features
 
-- **Sources in the Image**: Moodle is fetched at build time and pinned to an upstream commit, not downloaded at container startup
+- **Sources in the Image**: Moodle is fetched at build time and pinned to an
+  upstream commit, not downloaded at container startup
 - **Environment-Driven Config**: `config.php` is generated from environment variables
 - **Modern Web Stack**: PHP-FPM + nginx architecture (no mod_php)
 - **HTTP/2 and HTTP/3 (QUIC)**: Modern protocol support out of the box
@@ -72,7 +74,6 @@ Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM),
 ## Prerequisites
 
 - Docker Engine 24.0+
-- A Docker Compose release that supports the `pre_start` lifecycle hook
 - Access to `dhi.io` for the hardened MariaDB image (`docker login dhi.io`)
 - 4GB+ RAM (8GB+ recommended for production)
 - 20GB+ disk space
