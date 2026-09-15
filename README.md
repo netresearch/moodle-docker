@@ -1,18 +1,20 @@
-# Moodle 5.1 Docker Stack
+# Moodle 5.2 Docker Stack
 
 [![Docker Build](https://github.com/netresearch/moodle-docker/actions/workflows/docker-build.yml/badge.svg)](https://github.com/netresearch/moodle-docker/actions/workflows/docker-build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Moodle](https://img.shields.io/badge/Moodle-5.1-orange.svg)](https://moodle.org/)
+[![Moodle](https://img.shields.io/badge/Moodle-5.2-orange.svg)](https://moodle.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.4-blue.svg)](https://www.php.net/)
-[![nginx](https://img.shields.io/badge/nginx-1.27-green.svg)](https://nginx.org/)
-[![MariaDB](https://img.shields.io/badge/MariaDB-11.8-blue.svg)](https://mariadb.org/)
+[![nginx](https://img.shields.io/badge/nginx-1.31-green.svg)](https://nginx.org/)
+[![MariaDB](https://img.shields.io/badge/MariaDB-12.3%20hardened-blue.svg)](https://mariadb.org/)
 [![Valkey](https://img.shields.io/badge/Valkey-9-red.svg)](https://valkey.io/)
 
-Production-ready Docker Compose stack for Moodle 5.1 LMS with PHP 8.4 (PHP-FPM), nginx 1.27, MariaDB 11.8, and Valkey 9.
+Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM),
+nginx 1.31, MariaDB 12.3 (Docker Hardened Image), and Valkey 9.
 
 ## Key Features
 
-- **Runtime Moodle Download**: Moodle is downloaded at container startup, not baked into the image
+- **Sources in the Image**: Moodle is fetched at build time and pinned to an
+  upstream commit, not downloaded at container startup
 - **Environment-Driven Config**: `config.php` is generated from environment variables
 - **Modern Web Stack**: PHP-FPM + nginx architecture (no mod_php)
 - **HTTP/2 and HTTP/3 (QUIC)**: Modern protocol support out of the box
@@ -24,11 +26,11 @@ Production-ready Docker Compose stack for Moodle 5.1 LMS with PHP 8.4 (PHP-FPM),
 
 ```
                               ┌─────────────────────────────────────────────────┐
-                              │           Moodle 5.1 Docker Stack               │
+                              │           Moodle 5.2 Docker Stack               │
                               ├─────────────────────────────────────────────────┤
                               │                                                 │
         HTTP/HTTPS/QUIC       │  ┌────────────────────────────────────────┐    │
-      ───────────────────────►│  │           nginx 1.27                   │    │
+      ───────────────────────►│  │           nginx 1.31                   │    │
         (80/443)              │  │   HTTP/2 + HTTP/3 + Brotli             │    │
                               │  │   Static files, SSL termination        │    │
                               │  └──────────────────┬─────────────────────┘    │
@@ -37,12 +39,12 @@ Production-ready Docker Compose stack for Moodle 5.1 LMS with PHP 8.4 (PHP-FPM),
                               │                     ▼                           │
                               │  ┌──────────────────────────────────────────┐  │
                               │  │              PHP 8.4 FPM                 │  │
-                              │  │   Moodle App (downloaded at runtime)    │  │
+                              │  │   Moodle App (baked into the image)     │  │
                               │  │   OPcache + JIT + Redis extension       │  │
                               │  └──────┬───────────────────────┬──────────┘  │
                               │         │                       │              │
                               │  ┌──────┴──────┐         ┌──────┴──────┐      │
-                              │  │ MariaDB 11.8│         │  Valkey 9   │      │
+                              │  │ MariaDB 12.3│         │  Valkey 9   │      │
                               │  │  Database   │         │  Sessions   │      │
                               │  │             │         │  + Cache    │      │
                               │  └─────────────┘         └─────────────┘      │
@@ -62,17 +64,17 @@ Production-ready Docker Compose stack for Moodle 5.1 LMS with PHP 8.4 (PHP-FPM),
 
 | Component | Version | Description |
 |-----------|---------|-------------|
-| **nginx** | 1.27 | Web server with HTTP/2, HTTP/3 (QUIC), Brotli compression |
+| **nginx** | 1.31 | Web server with HTTP/2, HTTP/3 (QUIC), Brotli compression |
 | **PHP-FPM** | 8.4 | PHP runtime with OPcache JIT, Redis, igbinary, APCu |
-| **MariaDB** | 11.8 LTS | Database server with optimized InnoDB configuration |
+| **MariaDB** | 12.3 (hardened) | Docker Hardened Image, runs non-root (uid 65532) |
 | **Valkey** | 9 | Redis-compatible server for sessions and cache |
-| **Ofelia** | latest | Docker-native cron scheduler for Moodle tasks |
-| **Mailpit** | latest | Development mail catcher (optional, `dev` profile) |
+| **Ofelia** | 1.0.0 (netresearch) | Docker-native cron scheduler for Moodle tasks |
+| **Mailpit** | v1.31.1 | Development mail catcher (optional, `dev` profile) |
 
 ## Prerequisites
 
 - Docker Engine 24.0+
-- Docker Compose V2.20+
+- Access to `dhi.io` for the hardened MariaDB image (`docker login dhi.io`)
 - 4GB+ RAM (8GB+ recommended for production)
 - 20GB+ disk space
 
@@ -106,7 +108,7 @@ nano .env
 # Start all services
 docker compose up -d
 
-# Watch the logs (Moodle download takes 1-2 minutes on first start)
+# Watch the logs (first start copies the sources into the code volume)
 docker compose logs -f moodle
 ```
 
@@ -124,7 +126,7 @@ All configuration is done via environment variables in `.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MOODLE_VERSION` | `5.1.2` | Moodle version to download and install |
+| `MOODLE_VERSION` | `5.2.3` | Moodle version baked into the image; changing it needs a rebuild |
 | `MOODLE_URL` | `http://localhost` | Full URL to your Moodle site (no trailing slash) |
 | `SSL_PROXY` | `false` | Set to `true` if behind SSL-terminating proxy |
 | `MOODLE_DEBUG` | `false` | Enable Moodle debug mode for development |
@@ -170,17 +172,43 @@ To upgrade to a new Moodle version:
 
 ### 1. Check Available Versions
 
-Visit https://download.moodle.org/releases/latest/ to see available versions.
+Visit https://download.moodle.org/releases/latest/ to see available versions. The
+image is built from the matching Git tag at https://github.com/moodle/moodle/tags.
 
-### 2. Update Environment Variable
+### 2. Update Version and Commit Pin
+
+The build pins the upstream commit, so a version bump needs both values. Resolve
+the tag and cross-check it against Moodle's own release metadata:
+
+Replace `<version>` below with the release you are moving to, for example
+`5.2.4` once it is published:
+
+```bash
+# Commit the tag points at
+git ls-remote https://github.com/moodle/moodle.git "refs/tags/v<version>^{}"
+
+# Cross-check against Moodle's own release metadata: githash must match the
+# first characters of the commit above. `version` and `branch` describe the
+# release you are coming FROM - the API answers with what is newer than that.
+curl -s "https://download.moodle.org/api/1.3/updates.php?version=2026042003&branch=5.2&format=json" \
+  | grep -o '"release":"<version>[^}]*githash":"[^"]*"'
+```
 
 ```bash
 # Edit .env and change MOODLE_VERSION
 nano .env
-# Change: MOODLE_VERSION=5.1.3  (or desired version)
+# Change: MOODLE_VERSION=<version>
 ```
 
-### 3. Restart the Stack
+Then update `ARG MOODLE_COMMIT` in `docker/moodle/Dockerfile` to the resolved
+commit. A mismatch fails the build rather than producing an image whose contents
+nobody verified.
+
+### 3. Rebuild and Restart the Stack
+
+The sources ship inside the image, so the new version needs a rebuild — changing
+`MOODLE_VERSION` alone makes the container refuse to start rather than serve a
+version that is not there.
 
 ```bash
 # Enable maintenance mode first
@@ -189,7 +217,8 @@ docker compose exec moodle php /var/www/html/admin/cli/maintenance.php --enable
 # Backup database (recommended)
 docker compose exec database mysqldump -uroot -p"$DB_ROOT_PASSWORD" moodle | gzip > backup-$(date +%Y%m%d).sql.gz
 
-# Restart to trigger download of new version
+# Rebuild the image with the new version, then restart
+docker compose build moodle moodle-cron
 docker compose up -d moodle
 
 # Watch the upgrade
@@ -298,7 +327,7 @@ moodle-docker/
 
 | Volume | Purpose |
 |--------|---------|
-| `moodle_code` | Moodle PHP source code (downloaded at runtime) |
+| `moodle_code` | Moodle PHP source code (copied from the image on first start) |
 | `moodledata` | User files, cache, temp files |
 | `db_data` | MariaDB database files |
 | `valkey_data` | Valkey persistence (AOF) |
@@ -312,17 +341,29 @@ moodle-docker/
 
 ## Troubleshooting
 
-### Moodle Download Fails
+### Moodle Sources Missing or Version Mismatch
+
+The sources are baked into the image, so a failed fetch shows up as a build
+failure, not as a container that never becomes healthy.
+
+On a version mismatch the container exits during startup, so these use a
+one-off container rather than `exec`, which would need a running one.
 
 ```bash
 # Check container logs
 docker compose logs moodle
 
-# Verify internet connectivity from container
-docker compose exec moodle curl -I https://download.moodle.org
+# Which version does the image carry?
+docker compose run --rm --no-deps --entrypoint cat moodle /opt/moodle-dist/.moodle-version
 
-# Manual download URL test
-docker compose exec moodle curl -fSL "https://download.moodle.org/download.php/direct/stable501/moodle-5.1.2.tgz" -o /tmp/test.tgz
+# Which version is installed in the code volume?
+docker compose run --rm --no-deps --entrypoint cat moodle /var/www/html/.moodle-version
+
+# On a mismatch, set MOODLE_VERSION in .env, then rebuild and restart.
+# Compose passes that value as the build argument, so do not pass it again
+# here - a divergence between the two is what caused the mismatch.
+docker compose build moodle moodle-cron
+docker compose up -d moodle moodle-cron
 ```
 
 ### PHP-FPM Health Check Fails

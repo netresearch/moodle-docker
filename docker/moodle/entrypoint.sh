@@ -3,11 +3,14 @@ set -e
 
 # =============================================================================
 # Moodle 5.x Docker Entrypoint
-# Downloads Moodle on first run, generates config.php from environment
+# Installs the Moodle sources baked into the image, generates config.php from
+# environment
 # =============================================================================
 
 # Configuration
-MOODLE_VERSION="${MOODLE_VERSION:-5.1.2}"
+DIST_DIR="/opt/moodle-dist"
+IMAGE_VERSION=$(cat "${DIST_DIR}/.moodle-version" 2>/dev/null || echo "unknown")
+MOODLE_VERSION="${MOODLE_VERSION:-$IMAGE_VERSION}"
 INSTALL_DIR="/var/www/html"
 VERSION_FILE="${INSTALL_DIR}/.moodle-version"
 INSTALLED_VERSION=$(cat "$VERSION_FILE" 2>/dev/null || echo "none")
@@ -65,33 +68,24 @@ restore_user_plugins() {
     log "Plugin restore complete"
 }
 
-download_moodle() {
+install_moodle() {
     local version="$1"
 
-    # Extract major.minor for stable branch (e.g., 5.1.2 -> 501)
-    local major minor
-    major=$(echo "$version" | cut -d. -f1)
-    minor=$(echo "$version" | cut -d. -f2)
-    local stable_branch="${major}0${minor}"
+    log "Installing Moodle ${version} from image (${DIST_DIR})..."
 
-    log "Downloading Moodle ${version} (stable${stable_branch})..."
+    # Since Moodle 5.0 the web-facing tree lives under public/
+    if [ ! -f "${DIST_DIR}/public/version.php" ]; then
+        log "ERROR: no Moodle sources in this image at ${DIST_DIR}"
+        exit 1
+    fi
 
     # Backup existing plugins if upgrading
     if [ -d "$INSTALL_DIR/lib" ]; then
         backup_user_plugins
     fi
 
-    # Download Moodle
-    local download_url="https://download.moodle.org/download.php/direct/stable${stable_branch}/moodle-${version}.tgz"
-    log "Download URL: $download_url"
-
-    # Download to temp and extract
-    local temp_file="/tmp/moodle-${version}.tgz"
-    curl -fSL "$download_url" -o "$temp_file"
-
-    # Extract (strip the moodle-X.Y.Z directory)
-    tar -xzf "$temp_file" -C "$INSTALL_DIR" --strip-components=1
-    rm -f "$temp_file"
+    # Copy the baked-in sources over the code volume
+    cp -a "${DIST_DIR}/." "$INSTALL_DIR/"
 
     # Restore user plugins if we had any
     if [ -d "/tmp/plugins_backup" ]; then
@@ -228,11 +222,20 @@ fix_permissions() {
 
 log "Starting Moodle entrypoint..."
 log "MOODLE_VERSION=$MOODLE_VERSION"
+log "IMAGE_VERSION=$IMAGE_VERSION"
 log "INSTALLED_VERSION=$INSTALLED_VERSION"
 
-# Download/upgrade Moodle if needed
+# The sources ship with the image, so a differing MOODLE_VERSION cannot be
+# honoured at runtime. Refuse instead of serving a version nobody asked for.
+if [ "$MOODLE_VERSION" != "$IMAGE_VERSION" ]; then
+    log "ERROR: MOODLE_VERSION=$MOODLE_VERSION, but this image carries $IMAGE_VERSION"
+    log "Rebuild the image with --build-arg MOODLE_VERSION=$MOODLE_VERSION"
+    exit 1
+fi
+
+# Install/upgrade Moodle if needed
 if [ "$INSTALLED_VERSION" != "$MOODLE_VERSION" ]; then
-    download_moodle "$MOODLE_VERSION"
+    install_moodle "$MOODLE_VERSION"
 fi
 
 # Always regenerate config (environment may have changed)

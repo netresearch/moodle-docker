@@ -1,4 +1,4 @@
-# Moodle 5.1 Quick Start
+# Moodle 5.2 Quick Start
 
 Get Moodle running in under 5 minutes.
 
@@ -52,8 +52,8 @@ VALKEY_PASSWORD=<secure-password>
 docker compose up -d
 ```
 
-> **Note:** First startup downloads Moodle (~200MB) and may take a few minutes.
-> Watch progress with: `docker compose logs -f moodle`
+> **Note:** The sources ship in the image; first startup only copies them into
+> the code volume. Watch progress with: `docker compose logs -f moodle`
 
 ### 4. Access Moodle
 
@@ -83,11 +83,13 @@ To upgrade to a new Moodle version:
 
 1. Edit `.env` and change `MOODLE_VERSION`:
    ```env
-   MOODLE_VERSION=5.1.3
+   MOODLE_VERSION=5.2.4
    ```
 
-2. Restart the stack:
+2. Rebuild the image and restart the stack. The sources ship inside the image,
+   so a rebuild is required — without it the container refuses to start:
    ```bash
+   docker compose build moodle moodle-cron
    docker compose up -d
    ```
 

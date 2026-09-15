@@ -1,5 +1,5 @@
-# Moodle 5.1 Production Stack
-# PHP-FPM + nginx + MariaDB 11.8 + Valkey 9 + Ofelia + Mailpit
+# Moodle 5.2 Production Stack
+# PHP-FPM + nginx + MariaDB 12.3 (hardened) + Valkey 9 + Ofelia + Mailpit
 
 services:
   # ==========================================================================
@@ -36,17 +36,19 @@ services:
   # Moodle - PHP-FPM Application
   # ==========================================================================
   moodle:
-    image: netresearch/moodle:${MOODLE_VERSION:-5.1}
+    image: netresearch/moodle:${MOODLE_VERSION:-5.2.3}
     build:
       context: ./docker/moodle
       dockerfile: Dockerfile
+      args:
+        MOODLE_VERSION: ${MOODLE_VERSION:-5.2.3}
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_app
     restart: unless-stopped
     volumes:
       - moodle_code:/var/www/html
       - moodledata:/var/moodledata
     environment:
-      - MOODLE_VERSION=${MOODLE_VERSION:-5.1.2}
+      - MOODLE_VERSION=${MOODLE_VERSION:-5.2.3}
       - MOODLE_URL=${MOODLE_URL:-http://localhost}
       - DB_TYPE=${DB_TYPE:-mariadb}
       - DB_HOST=${DB_HOST:-database}
@@ -63,11 +65,11 @@ services:
       - SSL_PROXY=${SSL_PROXY:-false}
       - MOODLE_DEBUG=${MOODLE_DEBUG:-false}
     networks:
-      - frontend  # Needs internet access for Moodle download
+      - frontend  # Outbound access for Moodle itself (plugin updates, external services)
       - backend
     depends_on:
-      database:
-        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
       valkey:
         condition: service_healthy
     healthcheck:
@@ -75,16 +77,18 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 120s  # Allow time for Moodle download
+      start_period: 120s  # Allow time for the first copy into the code volume
 
   # ==========================================================================
   # Moodle Cron - Dedicated Container for Scheduled Tasks
   # ==========================================================================
   moodle-cron:
-    image: netresearch/moodle:${MOODLE_VERSION:-5.1}
+    image: netresearch/moodle:${MOODLE_VERSION:-5.2.3}
     build:
       context: ./docker/moodle
       dockerfile: Dockerfile
+      args:
+        MOODLE_VERSION: ${MOODLE_VERSION:-5.2.3}
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_cron
     restart: unless-stopped
     command: ["sleep", "infinity"]
@@ -114,20 +118,22 @@ services:
       ofelia.job-exec.moodle-cron.user: "www-data"
 
   # ==========================================================================
-  # MariaDB 11.8 LTS - Database
+  # MariaDB 12.3 - Database (Docker Hardened Image)
+  #
+  # The hardened image runs as non-root (uid 65532) and ships no my.cnf, so the
+  # tuning file is mounted at /etc/my.cnf - the first path the server reads.
+  # There is no conf.d include, and it honours only MARIADB_ROOT_PASSWORD; it
+  # creates neither database nor user, which db-init below does instead.
   # ==========================================================================
   database:
-    image: mariadb:11.8
+    image: dhi.io/mariadb:12.3
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_database
     restart: unless-stopped
     volumes:
       - db_data:/var/lib/mysql
-      - ./docker/mariadb/custom.cnf:/etc/mysql/conf.d/custom.cnf:ro
+      - ./docker/mariadb/custom.cnf:/etc/my.cnf:ro
     environment:
-      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
-      - MYSQL_DATABASE=${DB_NAME:-moodle}
-      - MYSQL_USER=${DB_USER:-moodle}
-      - MYSQL_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
     networks:
       - backend
     healthcheck:
@@ -136,6 +142,50 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # ==========================================================================
+  # Database bootstrap - creates the Moodle database and user
+  #
+  # The hardened image acts on MARIADB_ROOT_PASSWORD only: it creates neither
+  # database nor user, and offers no /docker-entrypoint-initdb.d. This runs
+  # once and exits. Idempotent, so repeated starts are harmless.
+  #
+  # Compose models init containers as pre_start hooks, which would be the
+  # tidier form, but the compose version on the CI runners (v2.38) rejects
+  # pre_start outright. A one-shot service works on every version.
+  # ==========================================================================
+  db-init:
+    image: dhi.io/mariadb:12.3
+    container_name: ${COMPOSE_PROJECT_NAME:-moodle}_db_init
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        # Identifiers cannot be parameterised, so reject anything that would
+        # break out of the quoting instead of interpolating it blindly.
+        case "$$DB_NAME$$DB_USER" in
+          *[!A-Za-z0-9_-]*) echo "DB_NAME and DB_USER may only contain A-Z a-z 0-9 _ -" >&2; exit 1 ;;
+        esac
+        # Single quotes are the only metacharacter inside a SQL string literal.
+        esc_pw=$$(printf '%s' "$$DB_PASSWORD" | sed "s/'/''/g")
+        mariadb -h database -u root -p"$$MARIADB_ROOT_PASSWORD" \
+          -e "CREATE DATABASE IF NOT EXISTS \`$$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+              CREATE USER IF NOT EXISTS '$$DB_USER'@'%' IDENTIFIED BY '$$esc_pw';
+              ALTER USER '$$DB_USER'@'%' IDENTIFIED BY '$$esc_pw';
+              GRANT ALL PRIVILEGES ON \`$$DB_NAME\`.* TO '$$DB_USER'@'%';
+              FLUSH PRIVILEGES;"
+        echo "database and user ready"
+    environment:
+      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
+      - DB_NAME=${DB_NAME:-moodle}
+      - DB_USER=${DB_USER:-moodle}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+    networks:
+      - backend
+    depends_on:
+      database:
+        condition: service_healthy
 
   # ==========================================================================
   # Valkey 9 - Redis-Compatible Cache & Sessions
@@ -164,10 +214,10 @@ services:
   # Ofelia - Cron Scheduler
   # ==========================================================================
   ofelia:
-    image: mcuadros/ofelia:latest
+    image: ghcr.io/netresearch/ofelia:1.0.0
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_ofelia
     restart: unless-stopped
-    command: daemon --docker
+    command: daemon
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -179,7 +229,7 @@ services:
   # Mailpit - Development Mail Catcher (Optional)
   # ==========================================================================
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.31.1
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_mailpit
     restart: unless-stopped
     profiles:
