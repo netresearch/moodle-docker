@@ -257,9 +257,14 @@ jobs:
       # The hardened MariaDB image lives on dhi.io, which needs a login. Without
       # the secrets the pull fails, so fail here with a clear message rather
       # than inside `compose up`, where it reads as an unhealthy container.
+      # Secrets reach the script through env, never expanded into the run
+      # block itself, where they would end up in the rendered command line.
       - name: Check dhi.io credentials
+        env:
+          DHI_USERNAME: ${{ secrets.DHI_USERNAME }}
+          DHI_TOKEN: ${{ secrets.DHI_TOKEN }}
         run: |
-          if [ -z "${{ secrets.DHI_USERNAME }}" ] || [ -z "${{ secrets.DHI_TOKEN }}" ]; then
+          if [ -z "${DHI_USERNAME:-}" ] || [ -z "${DHI_TOKEN:-}" ]; then
             echo "::error::Repository secrets DHI_USERNAME and DHI_TOKEN are required to pull dhi.io/mariadb"
             exit 1
           fi
