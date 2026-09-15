@@ -4,11 +4,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Moodle](https://img.shields.io/badge/Moodle-5.2-orange.svg)](https://moodle.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.4-blue.svg)](https://www.php.net/)
-[![nginx](https://img.shields.io/badge/nginx-1.27-green.svg)](https://nginx.org/)
+[![nginx](https://img.shields.io/badge/nginx-1.31-green.svg)](https://nginx.org/)
 [![MariaDB](https://img.shields.io/badge/MariaDB-11.8-blue.svg)](https://mariadb.org/)
 [![Valkey](https://img.shields.io/badge/Valkey-9-red.svg)](https://valkey.io/)
 
-Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM), nginx 1.27, MariaDB 11.8, and Valkey 9.
+Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM), nginx 1.31, MariaDB 11.8, and Valkey 9.
 
 ## Key Features
 
@@ -28,7 +28,7 @@ Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM),
                               ├─────────────────────────────────────────────────┤
                               │                                                 │
         HTTP/HTTPS/QUIC       │  ┌────────────────────────────────────────┐    │
-      ───────────────────────►│  │           nginx 1.27                   │    │
+      ───────────────────────►│  │           nginx 1.31                   │    │
         (80/443)              │  │   HTTP/2 + HTTP/3 + Brotli             │    │
                               │  │   Static files, SSL termination        │    │
                               │  └──────────────────┬─────────────────────┘    │
@@ -62,12 +62,12 @@ Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM),
 
 | Component | Version | Description |
 |-----------|---------|-------------|
-| **nginx** | 1.27 | Web server with HTTP/2, HTTP/3 (QUIC), Brotli compression |
+| **nginx** | 1.31 | Web server with HTTP/2, HTTP/3 (QUIC), Brotli compression |
 | **PHP-FPM** | 8.4 | PHP runtime with OPcache JIT, Redis, igbinary, APCu |
 | **MariaDB** | 11.8 LTS | Database server with optimized InnoDB configuration |
 | **Valkey** | 9 | Redis-compatible server for sessions and cache |
-| **Ofelia** | latest | Docker-native cron scheduler for Moodle tasks |
-| **Mailpit** | latest | Development mail catcher (optional, `dev` profile) |
+| **Ofelia** | 0.3.22 | Docker-native cron scheduler for Moodle tasks |
+| **Mailpit** | v1.31.1 | Development mail catcher (optional, `dev` profile) |
 
 ## Prerequisites
 

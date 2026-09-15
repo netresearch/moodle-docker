@@ -168,7 +168,7 @@ services:
   # Ofelia - Cron Scheduler
   # ==========================================================================
   ofelia:
-    image: mcuadros/ofelia:latest
+    image: mcuadros/ofelia:0.3.22
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_ofelia
     restart: unless-stopped
     command: daemon --docker
@@ -183,7 +183,7 @@ services:
   # Mailpit - Development Mail Catcher (Optional)
   # ==========================================================================
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.31.1
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_mailpit
     restart: unless-stopped
     profiles:
