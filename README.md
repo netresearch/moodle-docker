@@ -180,19 +180,24 @@ image is built from the matching Git tag at https://github.com/moodle/moodle/tag
 The build pins the upstream commit, so a version bump needs both values. Resolve
 the tag and cross-check it against Moodle's own release metadata:
 
+Replace `<version>` below with the release you are moving to, for example
+`5.2.4` once it is published:
+
 ```bash
 # Commit the tag points at
-git ls-remote https://github.com/moodle/moodle.git refs/tags/v5.2.4^{}
+git ls-remote https://github.com/moodle/moodle.git "refs/tags/v<version>^{}"
 
-# Cross-check: the githash in Moodle's release metadata must match its first chars
-curl -s "https://download.moodle.org/api/1.3/updates.php?version=2024100700&branch=5.1&format=json" \
-  | grep -o '"release":"5.2.4[^}]*githash":"[^"]*"'
+# Cross-check against Moodle's own release metadata: githash must match the
+# first characters of the commit above. `version` and `branch` describe the
+# release you are coming FROM - the API answers with what is newer than that.
+curl -s "https://download.moodle.org/api/1.3/updates.php?version=2026042003&branch=5.2&format=json" \
+  | grep -o '"release":"<version>[^}]*githash":"[^"]*"'
 ```
 
 ```bash
 # Edit .env and change MOODLE_VERSION
 nano .env
-# Change: MOODLE_VERSION=5.2.4  (or desired version)
+# Change: MOODLE_VERSION=<version>
 ```
 
 Then update `ARG MOODLE_COMMIT` in `docker/moodle/Dockerfile` to the resolved
