@@ -64,6 +64,7 @@ services:
       - SMTP_NOREPLY=${SMTP_NOREPLY:-noreply@example.com}
       - SSL_PROXY=${SSL_PROXY:-false}
       - REVERSE_PROXY=${REVERSE_PROXY:-false}
+      - ROUTER_CONFIGURED=${ROUTER_CONFIGURED:-true}
       - MOODLE_DEBUG=${MOODLE_DEBUG:-false}
     networks:
       - frontend  # Outbound access for Moodle itself (plugin updates, external services)

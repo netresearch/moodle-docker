@@ -131,6 +131,7 @@ All configuration is done via environment variables in `.env`:
 | `MOODLE_URL` | `http://localhost` | Full URL to your Moodle site (no trailing slash) |
 | `SSL_PROXY` | `false` | Set to `true` behind an SSL-terminating proxy; sets `$CFG->sslproxy` |
 | `REVERSE_PROXY` | `false` | Sets `$CFG->reverseproxy` for advanced load balancing or port forwarding; leave off for a plain TLS terminator |
+| `ROUTER_CONFIGURED` | `true` | Sets `$CFG->routerconfigured`; needs a web server that rewrites unknown paths to `r.php`, which the bundled nginx does |
 | `MOODLE_DEBUG` | `false` | Enable Moodle debug mode for development |
 
 ### Database Settings
@@ -312,6 +313,18 @@ Traefik alone. That matters because nginx trusts `X-Forwarded-Proto` to decide t
 behind Traefik the header is set by Traefik on every request, while the base stack publishes port 80 and
 anyone reaching it directly can declare any scheme. Do not publish those ports on a host that also sits behind
 a proxy.
+
+## Moodle Router
+
+Moodle serves routed paths such as `/api/rest/v2/openapi.json` through `r.php`. The bundled nginx sends anything that is
+not a real file there (`try_files $uri $uri/ /r.php$is_args$args`), and `ROUTER_CONFIGURED=true` tells Moodle it may
+emit those paths without the `/r.php` prefix. Site administration -> Server -> Environment then reports the router as
+configured.
+
+The rewrite and the flag are one setting in two places and only work together. With the flag off, the router sets its
+own base path to `/r.php` and an unprefixed request no longer matches, so the rewrite alone answers 404. With the flag
+on but no rewrite, Moodle emits links that never reach the router. Set `ROUTER_CONFIGURED=false` only when you front the
+Moodle image with your own web server and have not added the rewrite.
 
 ## File Structure
 
