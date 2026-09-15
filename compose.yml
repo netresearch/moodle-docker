@@ -65,6 +65,7 @@ services:
       - SSL_PROXY=${SSL_PROXY:-false}
       - REVERSE_PROXY=${REVERSE_PROXY:-false}
       - ROUTER_CONFIGURED=${ROUTER_CONFIGURED:-true}
+      - MOODLE_AUTO_UPGRADE=${MOODLE_AUTO_UPGRADE:-true}
       - MOODLE_DEBUG=${MOODLE_DEBUG:-false}
     networks:
       - frontend  # Outbound access for Moodle itself (plugin updates, external services)
@@ -121,7 +122,9 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 120s  # Allow time for the first copy into the code volume
+      # The first start copies the sources into the code volume and then runs
+      # the database upgrade, which on a large site takes minutes.
+      start_period: 600s
 
   # ==========================================================================
   # MariaDB 12.3 - Database (Docker Hardened Image)

@@ -254,6 +254,60 @@ fix_permissions() {
 }
 
 # =============================================================================
+# Database Upgrade
+# =============================================================================
+
+# Is this database already an installed Moodle? A fresh stack has an empty
+# database until someone runs the installer, and upgrade.php cannot help there.
+# The probe doubles as the "is the database reachable" check, because config.php
+# aborts when it is not - so its two failure modes are told apart by the caller.
+moodle_is_installed() {
+    local probe="/tmp/moodle-installed-probe.php"
+
+    cat > "$probe" <<PHPPROBE
+<?php
+define('CLI_SCRIPT', true);
+require('${INSTALL_DIR}/config.php');
+exit(\$DB->get_manager()->table_exists('config') ? 0 : 1);
+PHPPROBE
+
+    chmod 0644 "$probe"
+    su -s /bin/sh -c "php '$probe'" www-data >/dev/null 2>&1
+    local rc=$?
+    rm -f "$probe"
+    return $rc
+}
+
+# Bring the database up to the version of the sources in this image.
+#
+# upgrade.php is idempotent: it exits 0 with "Moodle is already up to date"
+# when there is nothing to do, so this runs on every start and only acts when
+# the code moved ahead of the database. Without it the site answers every
+# request with the "Upgrade Moodle database now" page until someone clicks
+# through the admin UI.
+upgrade_database() {
+    if [ "${MOODLE_AUTO_UPGRADE:-true}" != "true" ]; then
+        log "MOODLE_AUTO_UPGRADE is not true, skipping the database upgrade"
+        return 0
+    fi
+
+    if ! moodle_is_installed; then
+        log "No installed Moodle database found, skipping the database upgrade"
+        log "Run admin/cli/install_database.php once to create it"
+        return 0
+    fi
+
+    log "Upgrading the database if needed..."
+    if su -s /bin/sh -c "php ${INSTALL_DIR}/admin/cli/upgrade.php --non-interactive" www-data; then
+        log "Database is up to date"
+        return 0
+    fi
+
+    log "ERROR: the database upgrade failed - refusing to serve a half-upgraded site"
+    exit 1
+}
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -280,6 +334,9 @@ generate_config
 
 # Fix permissions
 fix_permissions
+
+# Bring the database up to the code version before serving anything
+upgrade_database
 
 log "Bootstrap complete, starting: $*"
 exec "$@"
