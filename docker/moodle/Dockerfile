@@ -44,20 +44,28 @@ RUN apk add --no-cache $RUNTIME_DEPS $BUILD_DEPS \
 
 # Moodle sources, baked into the image
 #
-# Fetched from the upstream Git tag rather than from download.moodle.org: the
-# tag is immutable, and codeload.github.com is reachable from CI runners while
-# download.moodle.org answers them with 403 (issue #74). Fetching at build time
-# rather than at container start also turns a failed fetch into a build failure
-# instead of a container that never becomes healthy.
+# Fetched from upstream Git rather than from download.moodle.org, which answers
+# CI runners with 403 (issue #74). Fetching at build time rather than at
+# container start also turns a failed fetch into a build failure instead of a
+# container that never becomes healthy.
+#
+# Integrity: cloning verifies every object against its hash, and the clone is
+# then held against MOODLE_COMMIT, so a moved tag or a substituted tree fails
+# the build. Take the commit from `git ls-remote <repo> refs/tags/v<version>^{}`
+# and cross-check it against the githash in Moodle's own release metadata at
+# download.moodle.org/api/1.3/updates.php.
 ARG MOODLE_VERSION=5.2.3
+ARG MOODLE_COMMIT=344232c15336c71b80f9aca8359ce0e0a9f3d116
 ENV MOODLE_VERSION=${MOODLE_VERSION}
 
-RUN mkdir -p /opt/moodle-dist \
-    && curl -fSL --proto '=https' --tlsv1.2 \
-        "https://github.com/moodle/moodle/archive/refs/tags/v${MOODLE_VERSION}.tar.gz" \
-        -o /tmp/moodle.tar.gz \
-    && tar -xzf /tmp/moodle.tar.gz -C /opt/moodle-dist --strip-components=1 \
-    && rm -f /tmp/moodle.tar.gz \
+RUN git clone --depth 1 --branch "v${MOODLE_VERSION}" \
+        https://github.com/moodle/moodle.git /opt/moodle-dist \
+    && actual="$(git -C /opt/moodle-dist rev-parse HEAD)" \
+    && if [ "$actual" != "${MOODLE_COMMIT}" ]; then \
+          echo "commit mismatch: got $actual, expected ${MOODLE_COMMIT}" >&2; \
+          exit 1; \
+       fi \
+    && rm -rf /opt/moodle-dist/.git \
     && grep -q "release  = '${MOODLE_VERSION}" /opt/moodle-dist/public/version.php \
     && echo "${MOODLE_VERSION}" > /opt/moodle-dist/.moodle-version
 

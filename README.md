@@ -173,13 +173,29 @@ To upgrade to a new Moodle version:
 Visit https://download.moodle.org/releases/latest/ to see available versions. The
 image is built from the matching Git tag at https://github.com/moodle/moodle/tags.
 
-### 2. Update Environment Variable
+### 2. Update Version and Commit Pin
+
+The build pins the upstream commit, so a version bump needs both values. Resolve
+the tag and cross-check it against Moodle's own release metadata:
+
+```bash
+# Commit the tag points at
+git ls-remote https://github.com/moodle/moodle.git refs/tags/v5.2.4^{}
+
+# Cross-check: the githash in Moodle's release metadata must match its first chars
+curl -s "https://download.moodle.org/api/1.3/updates.php?version=2024100700&branch=5.1&format=json" \
+  | grep -o '"release":"5.2.4[^}]*githash":"[^"]*"'
+```
 
 ```bash
 # Edit .env and change MOODLE_VERSION
 nano .env
 # Change: MOODLE_VERSION=5.2.4  (or desired version)
 ```
+
+Then update `ARG MOODLE_COMMIT` in `docker/moodle/Dockerfile` to the resolved
+commit. A mismatch fails the build rather than producing an image whose contents
+nobody verified.
 
 ### 3. Rebuild and Restart the Stack
 
