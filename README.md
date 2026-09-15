@@ -323,18 +323,24 @@ moodle-docker/
 The sources are baked into the image, so a failed fetch shows up as a build
 failure, not as a container that never becomes healthy.
 
+On a version mismatch the container exits during startup, so these use a
+one-off container rather than `exec`, which would need a running one.
+
 ```bash
 # Check container logs
 docker compose logs moodle
 
 # Which version does the image carry?
-docker compose exec moodle cat /opt/moodle-dist/.moodle-version
+docker compose run --rm --no-deps --entrypoint cat moodle /opt/moodle-dist/.moodle-version
 
 # Which version is installed in the code volume?
-docker compose exec moodle cat /var/www/html/.moodle-version
+docker compose run --rm --no-deps --entrypoint cat moodle /var/www/html/.moodle-version
 
-# On a mismatch, rebuild the image for the version you want
-docker compose build --build-arg MOODLE_VERSION=5.2.3 moodle moodle-cron
+# On a mismatch, set MOODLE_VERSION in .env, then rebuild and restart.
+# Compose passes that value as the build argument, so do not pass it again
+# here - a divergence between the two is what caused the mismatch.
+docker compose build moodle moodle-cron
+docker compose up -d moodle moodle-cron
 ```
 
 ### PHP-FPM Health Check Fails
