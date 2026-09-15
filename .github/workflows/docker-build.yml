@@ -31,6 +31,8 @@ jobs:
       # against current compose, not against the runner's.
       - name: Set up Docker Compose
         uses: docker/setup-compose-action@4eb059ff7f16592f9c84d5ca339c53cb7c5064e2 # v2.3.0
+        with:
+          version: latest
 
       - name: Validate docker-compose.yml syntax
         run: |
@@ -302,6 +304,8 @@ jobs:
       # preinstalled version does not know.
       - name: Set up Docker Compose
         uses: docker/setup-compose-action@4eb059ff7f16592f9c84d5ca339c53cb7c5064e2 # v2.3.0
+        with:
+          version: latest
 
       - name: Build and start services
         run: |
