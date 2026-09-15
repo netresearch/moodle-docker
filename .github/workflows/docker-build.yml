@@ -26,8 +26,15 @@ jobs:
           sed -i 's/CHANGE_ME_SECURE_ROOT_PASSWORD/test_root_456/g' .env
           sed -i 's/CHANGE_ME_SECURE_VALKEY_PASSWORD/test_valkey_789/g' .env
 
+      # The runner image ships an older compose than deployments run, and it
+      # rejects keys current compose accepts (pre_start among them). Validate
+      # against current compose, not against the runner's.
+      - name: Set up Docker Compose
+        uses: docker/setup-compose-action@4eb059ff7f16592f9c84d5ca339c53cb7c5064e2 # v2.3.0
+
       - name: Validate docker-compose.yml syntax
         run: |
+          docker compose version
           docker compose config > /dev/null
           echo "Docker Compose syntax is valid"
 
@@ -291,8 +298,14 @@ jobs:
             -out docker/nginx/ssl/cert.pem \
             -subj "/CN=localhost/O=CI Test/C=US"
 
+      # Same reason as in validate-compose: compose.yml uses keys the runner's
+      # preinstalled version does not know.
+      - name: Set up Docker Compose
+        uses: docker/setup-compose-action@4eb059ff7f16592f9c84d5ca339c53cb7c5064e2 # v2.3.0
+
       - name: Build and start services
         run: |
+          docker compose version
           docker compose build --no-cache
           docker compose up -d
           echo "Services started"
