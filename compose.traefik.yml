@@ -1,40 +1,33 @@
 # Traefik Override Configuration
 # Usage: docker compose -f compose.yml -f compose.traefik.yml up -d
 # Or: make start-traefik
+#
+# The labels belong to nginx, not to the moodle service: moodle runs PHP-FPM
+# and listens on 9000, so a router pointing at port 80 there has nothing to
+# talk to. nginx is the service that serves HTTP.
+#
+# Entrypoint and certresolver names differ per Traefik installation - set
+# TRAEFIK_ENTRYPOINT, TRAEFIK_CERTRESOLVER and TRAEFIK_NETWORK to match yours.
 
 services:
-  moodle:
-    # Disable direct port exposure (Traefik handles routing)
-    ports: []
+  nginx:
+    # Traefik terminates TLS and routes to this container, so it must not bind
+    # host ports itself.
+    ports: !reset []
 
-    # Enable Traefik labels
     labels:
-      # Ofelia cron labels (keep these)
-      ofelia.enabled: "true"
-      ofelia.job-exec.moodle-cron.schedule: "@every 1m"
-      ofelia.job-exec.moodle-cron.command: "php /var/www/html/admin/cli/cron.php"
-      ofelia.job-exec.moodle-cron.user: "www-data"
-
-      # Traefik configuration
       traefik.enable: "true"
 
-      # HTTP router
+      # HTTPS router
       traefik.http.routers.moodle.rule: "Host(`${MOODLE_DOMAIN:-moodle.localhost}`)"
-      traefik.http.routers.moodle.entrypoints: "websecure"
+      traefik.http.routers.moodle.entrypoints: "${TRAEFIK_ENTRYPOINT:-websecure}"
       traefik.http.routers.moodle.tls: "true"
       traefik.http.routers.moodle.tls.certresolver: "${TRAEFIK_CERTRESOLVER:-letsencrypt}"
-
-      # Service configuration
       traefik.http.services.moodle.loadbalancer.server.port: "80"
-
-      # Middleware (optional - uncomment if needed)
-      # traefik.http.routers.moodle.middlewares: "moodle-headers"
-      # traefik.http.middlewares.moodle-headers.headers.customResponseHeaders.X-Frame-Options: "SAMEORIGIN"
-      # traefik.http.middlewares.moodle-headers.headers.customResponseHeaders.X-Content-Type-Options: "nosniff"
 
       # HTTP to HTTPS redirect
       traefik.http.routers.moodle-http.rule: "Host(`${MOODLE_DOMAIN:-moodle.localhost}`)"
-      traefik.http.routers.moodle-http.entrypoints: "web"
+      traefik.http.routers.moodle-http.entrypoints: "${TRAEFIK_ENTRYPOINT_HTTP:-web}"
       traefik.http.routers.moodle-http.middlewares: "moodle-redirect"
       traefik.http.middlewares.moodle-redirect.redirectscheme.scheme: "https"
       traefik.http.middlewares.moodle-redirect.redirectscheme.permanent: "true"
@@ -42,7 +35,7 @@ services:
     networks:
       - frontend
       - backend
-      - traefik  # Add Traefik network
+      - traefik
 
 networks:
   traefik:
