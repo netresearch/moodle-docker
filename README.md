@@ -1,14 +1,14 @@
-# Moodle 5.1 Docker Stack
+# Moodle 5.2 Docker Stack
 
 [![Docker Build](https://github.com/netresearch/moodle-docker/actions/workflows/docker-build.yml/badge.svg)](https://github.com/netresearch/moodle-docker/actions/workflows/docker-build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Moodle](https://img.shields.io/badge/Moodle-5.1-orange.svg)](https://moodle.org/)
+[![Moodle](https://img.shields.io/badge/Moodle-5.2-orange.svg)](https://moodle.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.4-blue.svg)](https://www.php.net/)
 [![nginx](https://img.shields.io/badge/nginx-1.27-green.svg)](https://nginx.org/)
 [![MariaDB](https://img.shields.io/badge/MariaDB-11.8-blue.svg)](https://mariadb.org/)
 [![Valkey](https://img.shields.io/badge/Valkey-9-red.svg)](https://valkey.io/)
 
-Production-ready Docker Compose stack for Moodle 5.1 LMS with PHP 8.4 (PHP-FPM), nginx 1.27, MariaDB 11.8, and Valkey 9.
+Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM), nginx 1.27, MariaDB 11.8, and Valkey 9.
 
 ## Key Features
 
@@ -24,7 +24,7 @@ Production-ready Docker Compose stack for Moodle 5.1 LMS with PHP 8.4 (PHP-FPM),
 
 ```
                               ┌─────────────────────────────────────────────────┐
-                              │           Moodle 5.1 Docker Stack               │
+                              │           Moodle 5.2 Docker Stack               │
                               ├─────────────────────────────────────────────────┤
                               │                                                 │
         HTTP/HTTPS/QUIC       │  ┌────────────────────────────────────────┐    │
@@ -124,7 +124,7 @@ All configuration is done via environment variables in `.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MOODLE_VERSION` | `5.1.2` | Moodle version to download and install |
+| `MOODLE_VERSION` | `5.2.3` | Moodle version baked into the image; changing it needs a rebuild |
 | `MOODLE_URL` | `http://localhost` | Full URL to your Moodle site (no trailing slash) |
 | `SSL_PROXY` | `false` | Set to `true` if behind SSL-terminating proxy |
 | `MOODLE_DEBUG` | `false` | Enable Moodle debug mode for development |
