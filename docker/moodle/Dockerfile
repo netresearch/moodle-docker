@@ -53,7 +53,8 @@ ARG MOODLE_VERSION=5.2.3
 ENV MOODLE_VERSION=${MOODLE_VERSION}
 
 RUN mkdir -p /opt/moodle-dist \
-    && curl -fSL "https://github.com/moodle/moodle/archive/refs/tags/v${MOODLE_VERSION}.tar.gz" \
+    && curl -fSL --proto '=https' --tlsv1.2 \
+        "https://github.com/moodle/moodle/archive/refs/tags/v${MOODLE_VERSION}.tar.gz" \
         -o /tmp/moodle.tar.gz \
     && tar -xzf /tmp/moodle.tar.gz -C /opt/moodle-dist --strip-components=1 \
     && rm -f /tmp/moodle.tar.gz \
