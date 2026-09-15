@@ -63,6 +63,7 @@ services:
       - SMTP_PORT=${SMTP_PORT:-1025}
       - SMTP_NOREPLY=${SMTP_NOREPLY:-noreply@example.com}
       - SSL_PROXY=${SSL_PROXY:-false}
+      - REVERSE_PROXY=${REVERSE_PROXY:-false}
       - MOODLE_DEBUG=${MOODLE_DEBUG:-false}
     networks:
       - frontend  # Outbound access for Moodle itself (plugin updates, external services)
@@ -127,7 +128,7 @@ services:
   # The hardened image runs as non-root (uid 65532) and ships no my.cnf, so the
   # tuning file is mounted at /etc/my.cnf - the first path the server reads.
   # There is no conf.d include, and it honours only MARIADB_ROOT_PASSWORD; it
-  # creates neither database nor user, which db-init below does instead.
+  # creates neither database nor user - the pre_start hook on moodle does that.
   # ==========================================================================
   database:
     image: dhi.io/mariadb:12.3
