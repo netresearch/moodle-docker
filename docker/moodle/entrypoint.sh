@@ -254,6 +254,33 @@ fix_permissions() {
 }
 
 # =============================================================================
+# Composer Dependencies
+# =============================================================================
+
+# The image builds vendor/ and install_moodle copies it along with everything
+# else, so a volume filled by this image has it. A volume filled by an older
+# one does not, and nothing repairs that on a same-version start: the sources
+# are only copied when the version changes. Moodle then reports "Composer
+# installed data not found" in its environment check and anything relying on
+# the autoloader breaks. Restore it rather than serve an install that is
+# missing its dependencies.
+ensure_vendor() {
+    if [ -f "${INSTALL_DIR}/vendor/autoload.php" ]; then
+        return 0
+    fi
+
+    if [ ! -f "${DIST_DIR}/vendor/autoload.php" ]; then
+        log "ERROR: no vendor/ in this image at ${DIST_DIR} - rebuild it"
+        exit 1
+    fi
+
+    log "vendor/ is missing from the code volume, restoring it from the image..."
+    rm -rf "${INSTALL_DIR}/vendor"
+    cp -a "${DIST_DIR}/vendor" "${INSTALL_DIR}/vendor"
+    log "vendor/ restored"
+}
+
+# =============================================================================
 # Database Upgrade
 # =============================================================================
 
@@ -328,6 +355,9 @@ fi
 if [ "$INSTALLED_VERSION" != "$MOODLE_VERSION" ]; then
     install_moodle "$MOODLE_VERSION"
 fi
+
+# A volume from an older image can be missing vendor/
+ensure_vendor
 
 # Always regenerate config (environment may have changed)
 generate_config
