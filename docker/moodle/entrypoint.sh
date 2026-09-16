@@ -286,21 +286,34 @@ ensure_vendor() {
 
 # Is this database already an installed Moodle? A fresh stack has an empty
 # database until someone runs the installer, and upgrade.php cannot help there.
-# The probe doubles as the "is the database reachable" check, because config.php
-# aborts when it is not - so its two failure modes are told apart by the caller.
+#
+# Three outcomes, and they must stay apart: 0 installed, PROBE_EMPTY an empty
+# database, anything else a probe that could not answer - an unreachable
+# database aborts in config.php long before the table check. Folding the last
+# two together would let a database outage look like a fresh install, skip the
+# upgrade and serve whatever the code volume happens to hold.
+PROBE_EMPTY=10
+PROBE_OUTPUT=""
+
 moodle_is_installed() {
     local probe="/tmp/moodle-installed-probe.php"
+    local rc=0
 
     cat > "$probe" <<PHPPROBE
 <?php
 define('CLI_SCRIPT', true);
 require('${INSTALL_DIR}/config.php');
-exit(\$DB->get_manager()->table_exists('config') ? 0 : 1);
+exit(\$DB->get_manager()->table_exists('config') ? 0 : ${PROBE_EMPTY});
 PHPPROBE
 
     chmod 0644 "$probe"
-    su -s /bin/sh -c "php '$probe'" www-data >/dev/null 2>&1
-    local rc=$?
+    # A "! cmd" condition would hand back the negated status, not the probe's,
+    # so the exit code has to come out of a || list. The output is captured
+    # rather than discarded: "probe exit 1" on its own tells an operator
+    # nothing, and the reason it failed is exactly what they need. It goes into
+    # a variable, not a file - www-data has no writable directory here that is
+    # not part of the site.
+    PROBE_OUTPUT=$(su -s /bin/sh -c "php '$probe' 2>&1" www-data) || rc=$?
     rm -f "$probe"
     return $rc
 }
@@ -318,10 +331,20 @@ upgrade_database() {
         return 0
     fi
 
-    if ! moodle_is_installed; then
+    local probe_rc=0
+    moodle_is_installed || probe_rc=$?
+
+    if [ "$probe_rc" -eq "$PROBE_EMPTY" ]; then
         log "No installed Moodle database found, skipping the database upgrade"
         log "Run admin/cli/install_database.php once to create it"
         return 0
+    fi
+
+    if [ "$probe_rc" -ne 0 ]; then
+        log "ERROR: cannot tell whether the database holds a Moodle install (probe exit ${probe_rc})"
+        log "Refusing to serve a site whose database state is unknown. The probe said:"
+        printf '%s\n' "$PROBE_OUTPUT" | sed -e 's/^/[moodle-entrypoint]   /' >&2
+        exit 1
     fi
 
     log "Upgrading the database if needed..."
