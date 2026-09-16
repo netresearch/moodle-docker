@@ -132,6 +132,7 @@ All configuration is done via environment variables in `.env`:
 | `SSL_PROXY` | `false` | Set to `true` behind an SSL-terminating proxy; sets `$CFG->sslproxy` |
 | `REVERSE_PROXY` | `false` | Sets `$CFG->reverseproxy` for advanced load balancing or port forwarding; leave off for a plain TLS terminator |
 | `ROUTER_CONFIGURED` | `true` | Sets `$CFG->routerconfigured`; needs a web server that rewrites unknown paths to `r.php`, which the bundled nginx does |
+| `MOODLE_AUTO_UPGRADE` | `true` | Run `admin/cli/upgrade.php` on container start so a new image also upgrades the database |
 | `MOODLE_DEBUG` | `false` | Enable Moodle debug mode for development |
 
 ### Database Settings
@@ -313,6 +314,21 @@ Traefik alone. That matters because nginx trusts `X-Forwarded-Proto` to decide t
 behind Traefik the header is set by Traefik on every request, while the base stack publishes port 80 and
 anyone reaching it directly can declare any scheme. Do not publish those ports on a host that also sits behind
 a proxy.
+
+## Upgrades
+
+The Moodle sources are baked into the image, so an upgrade is a new image: change `MOODLE_VERSION`, rebuild, and start
+the stack again. The entrypoint then copies the new sources into the code volume and runs `admin/cli/upgrade.php`
+itself, so the site comes back upgraded instead of serving the "Upgrade Moodle database now" page until someone clicks
+through the admin UI.
+
+That call is idempotent — it exits without doing anything when the database already matches the code — so it runs on
+every start and only acts when the code moved ahead. A failed upgrade aborts the entrypoint rather than serving a
+half-upgraded site; with the stack's `restart: unless-stopped` that shows up as a restart loop with the reason in
+`docker compose logs moodle`. Set `MOODLE_AUTO_UPGRADE=false` to take the step into your own hands.
+
+An empty database is left alone: `upgrade.php` cannot install a site. Create it once with
+`docker compose exec moodle php /var/www/html/admin/cli/install_database.php --agree-license --adminpass=... --adminemail=...`.
 
 ## Moodle Router
 

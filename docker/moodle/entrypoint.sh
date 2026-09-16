@@ -254,6 +254,110 @@ fix_permissions() {
 }
 
 # =============================================================================
+# Composer Dependencies
+# =============================================================================
+
+# The image builds vendor/ and install_moodle copies it along with everything
+# else, so a volume filled by this image has it. A volume filled by an older
+# one does not, and nothing repairs that on a same-version start: the sources
+# are only copied when the version changes. Moodle then reports "Composer
+# installed data not found" in its environment check and anything relying on
+# the autoloader breaks. Restore it rather than serve an install that is
+# missing its dependencies.
+ensure_vendor() {
+    if [ -f "${INSTALL_DIR}/vendor/autoload.php" ]; then
+        return 0
+    fi
+
+    if [ ! -f "${DIST_DIR}/vendor/autoload.php" ]; then
+        log "ERROR: no vendor/ in this image at ${DIST_DIR} - rebuild it"
+        exit 1
+    fi
+
+    log "vendor/ is missing from the code volume, restoring it from the image..."
+    rm -rf "${INSTALL_DIR}/vendor"
+    cp -a "${DIST_DIR}/vendor" "${INSTALL_DIR}/vendor"
+    log "vendor/ restored"
+}
+
+# =============================================================================
+# Database Upgrade
+# =============================================================================
+
+# Is this database already an installed Moodle? A fresh stack has an empty
+# database until someone runs the installer, and upgrade.php cannot help there.
+#
+# Three outcomes, and they must stay apart: 0 installed, PROBE_EMPTY an empty
+# database, anything else a probe that could not answer - an unreachable
+# database aborts in config.php long before the table check. Folding the last
+# two together would let a database outage look like a fresh install, skip the
+# upgrade and serve whatever the code volume happens to hold.
+PROBE_EMPTY=10
+PROBE_OUTPUT=""
+
+moodle_is_installed() {
+    local probe="/tmp/moodle-installed-probe.php"
+    local rc=0
+
+    cat > "$probe" <<PHPPROBE
+<?php
+define('CLI_SCRIPT', true);
+require('${INSTALL_DIR}/config.php');
+exit(\$DB->get_manager()->table_exists('config') ? 0 : ${PROBE_EMPTY});
+PHPPROBE
+
+    chmod 0644 "$probe"
+    # A "! cmd" condition would hand back the negated status, not the probe's,
+    # so the exit code has to come out of a || list. The output is captured
+    # rather than discarded: "probe exit 1" on its own tells an operator
+    # nothing, and the reason it failed is exactly what they need. It goes into
+    # a variable, not a file - www-data has no writable directory here that is
+    # not part of the site.
+    PROBE_OUTPUT=$(su -s /bin/sh -c "php '$probe' 2>&1" www-data) || rc=$?
+    rm -f "$probe"
+    return $rc
+}
+
+# Bring the database up to the version of the sources in this image.
+#
+# upgrade.php is idempotent: it exits 0 with "Moodle is already up to date"
+# when there is nothing to do, so this runs on every start and only acts when
+# the code moved ahead of the database. Without it the site answers every
+# request with the "Upgrade Moodle database now" page until someone clicks
+# through the admin UI.
+upgrade_database() {
+    if [ "${MOODLE_AUTO_UPGRADE:-true}" != "true" ]; then
+        log "MOODLE_AUTO_UPGRADE is not true, skipping the database upgrade"
+        return 0
+    fi
+
+    local probe_rc=0
+    moodle_is_installed || probe_rc=$?
+
+    if [ "$probe_rc" -eq "$PROBE_EMPTY" ]; then
+        log "No installed Moodle database found, skipping the database upgrade"
+        log "Run admin/cli/install_database.php once to create it"
+        return 0
+    fi
+
+    if [ "$probe_rc" -ne 0 ]; then
+        log "ERROR: cannot tell whether the database holds a Moodle install (probe exit ${probe_rc})"
+        log "Refusing to serve a site whose database state is unknown. The probe said:"
+        printf '%s\n' "$PROBE_OUTPUT" | sed -e 's/^/[moodle-entrypoint]   /' >&2
+        exit 1
+    fi
+
+    log "Upgrading the database if needed..."
+    if su -s /bin/sh -c "php ${INSTALL_DIR}/admin/cli/upgrade.php --non-interactive" www-data; then
+        log "Database is up to date"
+        return 0
+    fi
+
+    log "ERROR: the database upgrade failed - refusing to serve a half-upgraded site"
+    exit 1
+}
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -275,11 +379,17 @@ if [ "$INSTALLED_VERSION" != "$MOODLE_VERSION" ]; then
     install_moodle "$MOODLE_VERSION"
 fi
 
+# A volume from an older image can be missing vendor/
+ensure_vendor
+
 # Always regenerate config (environment may have changed)
 generate_config
 
 # Fix permissions
 fix_permissions
+
+# Bring the database up to the code version before serving anything
+upgrade_database
 
 log "Bootstrap complete, starting: $*"
 exec "$@"
