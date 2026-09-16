@@ -29,37 +29,43 @@ cd moodle-docker
 ### 2. Configure environment
 
 ```bash
-# Copy the example configuration
-cp .env.example .env
+# Creates .env with three random passwords and a self-signed TLS certificate
+make setup
 
-# Generate secure passwords and update .env
-# Replace the CHANGE_ME values with secure passwords:
+# Review the result
 nano .env
 ```
 
-**Required changes in `.env`:**
-```env
-DB_PASSWORD=<secure-password>
-DB_ROOT_PASSWORD=<secure-password>
-VALKEY_PASSWORD=<secure-password>
-```
+> **Note:** nginx listens on 443 and will not start without a certificate in `docker/nginx/ssl/`. `make setup` creates
+> a self-signed one; replace it for production, or put the stack behind Traefik.
 
-> **Tip:** Generate secure passwords with: `openssl rand -base64 32`
+To fill in `.env` by hand, replace the three `CHANGE_ME_...` placeholders with values from the alphanumeric alphabet —
+a `base64` password can contain `/`, which breaks the `sed` that inserts it:
+
+```bash
+LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32
+```
 
 ### 3. Start Moodle
 
 ```bash
-docker compose up -d
+make start          # or: docker compose up -d
 ```
 
 > **Note:** The sources ship in the image; first startup only copies them into
 > the code volume. Watch progress with: `docker compose logs -f moodle`
 
-### 4. Access Moodle
+### 4. Create the Moodle database
 
-Open your browser: **http://localhost**
+The stack starts with an empty database. Create the site once:
 
-Follow the on-screen installation wizard to complete setup.
+```bash
+make install ADMIN_PASS='<password>' ADMIN_EMAIL='<address>'
+```
+
+### 5. Access Moodle
+
+Open your browser: **http://localhost** and sign in as `admin`.
 
 ---
 
