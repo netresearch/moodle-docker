@@ -196,6 +196,16 @@ global \$CFG;
 \$CFG->routerconfigured = ${router_configured_php};
 
 // =============================================================================
+// Security
+//
+// preventexecpath keeps the paths to helper binaries (ghostscript, unoconv,
+// aspell and friends) out of the admin UI, so nobody with access to it can
+// point Moodle at an arbitrary executable. They come from this file instead -
+// add them here if the image ever ships any.
+// =============================================================================
+\$CFG->preventexecpath = true;
+
+// =============================================================================
 // Email Settings
 // =============================================================================
 \$CFG->smtphosts = '${SMTP_HOST:-mailpit}:${SMTP_PORT:-1025}';
@@ -251,6 +261,28 @@ fix_permissions() {
     fi
 
     log "Permissions fixed"
+}
+
+# =============================================================================
+# Config Hardening
+# =============================================================================
+
+# fix_permissions hands the whole tree to www-data, which leaves config.php
+# writable by the web user - the one file that must not be. Moodle's own
+# security report flags it, and it is the obvious target for anything that
+# manages to write through PHP. The entrypoint regenerates the file on every
+# start as root, so nothing needs write access to it at runtime.
+protect_config() {
+    local written=0
+
+    for config in "${INSTALL_DIR}/config.php" "${INSTALL_DIR}/public/config.php"; do
+        [ -f "$config" ] || continue
+        chown root:www-data "$config"
+        chmod 0440 "$config"
+        written=$((written + 1))
+    done
+
+    log "config.php is read-only for the web user (${written} file(s))"
 }
 
 # =============================================================================
@@ -387,6 +419,9 @@ generate_config
 
 # Fix permissions
 fix_permissions
+
+# ...then take the write bit off config.php again
+protect_config
 
 # Bring the database up to the code version before serving anything
 upgrade_database
