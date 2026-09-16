@@ -45,10 +45,12 @@ certs: ## Create a self-signed TLS certificate for nginx if there is none
 		echo "✅ TLS certificate already present"; \
 	else \
 		echo "🔐 Creating a self-signed TLS certificate (nginx will not start without one)..."; \
+		command -v openssl >/dev/null || { echo "❌ openssl not found - install it or drop your own cert.pem/key.pem into docker/nginx/ssl/"; exit 1; }; \
 		openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
 			-keyout docker/nginx/ssl/key.pem \
 			-out docker/nginx/ssl/cert.pem \
-			-subj "/CN=localhost" 2>/dev/null; \
+			-subj "/CN=localhost" >/dev/null 2>&1 \
+			|| { echo "❌ openssl could not create the certificate"; rm -f docker/nginx/ssl/key.pem docker/nginx/ssl/cert.pem; exit 1; }; \
 		echo "✅ Certificate created - replace it with a real one for production"; \
 	fi
 
