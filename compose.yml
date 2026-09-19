@@ -194,7 +194,7 @@ services:
   # Mailpit - Development Mail Catcher (Optional)
   # ==========================================================================
   mailpit:
-    image: axllent/mailpit:v1.31.1
+    image: axllent/mailpit:v1.31.2
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_mailpit
     restart: unless-stopped
     profiles:
