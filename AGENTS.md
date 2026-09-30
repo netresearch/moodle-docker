@@ -65,3 +65,14 @@ The Moodle sources ship inside the image, so an upgrade is a new image. The
 entrypoint copies them into the code volume and runs
 `admin/cli/upgrade.php --non-interactive` itself; a failure aborts the
 entrypoint rather than serving a half-upgraded site.
+
+**"There is a newer Moodle version available: 5.2.3+" is not an error.** The
+notice names the version on offer, not the installed one. The `+` marks a
+weekly build of the stable branch after the release tag: `v5.2.3` carries
+`2026042003.00` / `5.2.3 (Build: 20260914)`, the `MOODLE_502_STABLE` tip
+`2026042003.03` / `5.2.3+ (Build: 20260928)` (measured 2026-09-30, the tag on
+the running academy site). No tag exists for such a build, so there is no
+5.2.4 to find, and neither Renovate nor the `MOODLE_COMMIT` pin in the
+Dockerfile will ever move to it; the pin follows tags on purpose, because a
+branch tip makes the image unreproducible. Read Moodle's release notes to see
+whether a fix you need is already on the branch, and wait for the next tag.
