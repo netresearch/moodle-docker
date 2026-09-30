@@ -38,6 +38,11 @@
   ],
   "packageRules": [
     {
+      "description": "Keep all Moodle references in one update, so the Dockerfile pin and the compose defaults never diverge",
+      "matchPackageNames": ["moodle/moodle"],
+      "groupName": "moodle/moodle"
+    },
+    {
       "description": "Moodle patch releases merge on their own once the checks pass",
       "matchPackageNames": ["moodle/moodle"],
       "matchUpdateTypes": ["patch"],
