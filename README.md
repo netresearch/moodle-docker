@@ -140,7 +140,7 @@ All configuration is done via environment variables in `.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MOODLE_VERSION` | `5.2.3` | Moodle version baked into the image; changing it needs a rebuild |
+| `MOODLE_VERSION` | `5.3.0` | Moodle version baked into the image; changing it needs a rebuild |
 | `MOODLE_URL` | `http://localhost` | Full URL to your Moodle site (no trailing slash) |
 | `SSL_PROXY` | `false` | Set to `true` behind an SSL-terminating proxy; sets `$CFG->sslproxy` |
 | `REVERSE_PROXY` | `false` | Sets `$CFG->reverseproxy` for advanced load balancing or port forwarding; leave off for a plain TLS terminator |
