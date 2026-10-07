@@ -25,6 +25,19 @@ function read_json(string $file): array
     return json_decode(file_get_contents($file), true, 512, JSON_THROW_ON_ERROR);
 }
 
+function refuse(string $reason): never
+{
+    fwrite(STDERR, "moodle-addons: $reason\n");
+    exit(1);
+}
+
+// The plugin type paths come from <new-tree>, which keeps the web-facing code
+// under public/ since Moodle 5.1. An older tree has its plugins at the root,
+// none of those paths would match, and every add-on would look absent.
+if (is_dir("$old/lib") && !is_file("$old/public/version.php")) {
+    refuse("$old has no public/version.php - code from before Moodle 5.1 is not supported, move its add-ons by hand");
+}
+
 // Without the old tree's list of standard plugins there is no telling a core
 // plugin from an add-on, so refuse rather than guess - unless there is nothing
 // to tell apart (a fresh install).
@@ -32,8 +45,10 @@ $standard = is_file("$old/lib/plugins.json")
     ? (read_json("$old/lib/plugins.json")['standard'] ?? [])
     : null;
 
-// Plugin type => directory relative to the tree root.
-$types = read_json("$new/lib/components.json")['plugintypes'];
+// Plugin type => directory relative to the tree root. Plugins of a deprecated
+// type still load, so they are add-ons like any other.
+$components = read_json("$new/lib/components.json");
+$types = $components['plugintypes'] + ($components['deprecatedplugintypes'] ?? []);
 
 // Which tree a subplugin type was taken from. A type declared by a core
 // plugin in <new-tree> wins over the same name declared by an add-on.
@@ -53,7 +68,15 @@ while ($queue) {
         foreach (glob("$tree/$path/*/db/subplugins.json") ?: [] as $file) {
             $plugindir = dirname($file, 2);
             $relative = substr($plugindir, strlen($tree) + 1);
-            foreach (read_json($file)['subplugintypes'] ?? [] as $subtype => $subpath) {
+            // Moodle logs an unreadable subplugins.json and carries on, so a
+            // broken add-on must not stop the upgrade here either.
+            try {
+                $declared = read_json($file)['subplugintypes'] ?? [];
+            } catch (JsonException $e) {
+                fwrite(STDERR, "moodle-addons: ignoring $file: {$e->getMessage()}\n");
+                continue;
+            }
+            foreach ($declared as $subtype => $subpath) {
                 $from = $tree === $new ? 'new' : 'old';
                 if (!isset($types[$subtype]) || ($origin[$subtype] === 'old' && $from === 'new')) {
                     $types[$subtype] = $queue[$subtype] = "$relative/$subpath";
@@ -72,8 +95,7 @@ while ($queue) {
             continue;
         }
         if ($standard === null) {
-            fwrite(STDERR, "$old/lib/plugins.json is missing, cannot tell core plugins from add-ons\n");
-            exit(1);
+            refuse("$old/lib/plugins.json is missing, cannot tell core plugins from add-ons");
         }
         if (in_array($name, $standard[$type] ?? [], true)) {
             continue;

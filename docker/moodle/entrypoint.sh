@@ -49,9 +49,20 @@ install_moodle() {
 
     log "Installing Moodle ${version} from image (${DIST_DIR})..."
 
-    # Since Moodle 5.0 the web-facing tree lives under public/
+    # Since Moodle 5.1 the web-facing tree lives under public/
     if [ ! -f "${DIST_DIR}/public/version.php" ]; then
         log "ERROR: no Moodle sources in this image at ${DIST_DIR}"
+        exit 1
+    fi
+
+    # The old tree is about to be moved and deleted. A directory mounted into
+    # it from the host would be emptied on the host by that delete, so refuse.
+    local mounts
+    mounts=$(awk -v root="$INSTALL_DIR" 'index($5, root "/") == 1 { print $5 }' /proc/self/mountinfo)
+    if [ -n "$mounts" ]; then
+        log "ERROR: mounted below ${INSTALL_DIR}, which an upgrade replaces:"
+        printf '%s\n' "$mounts" | sed -e 's/^/[moodle-entrypoint]   /' >&2
+        log "Mount add-on plugins into the image or copy them into the volume instead"
         exit 1
     fi
 
@@ -84,7 +95,12 @@ install_moodle() {
     cp -a "${DIST_DIR}/." "$INSTALL_DIR/"
 
     local addons
-    addons=$(php /usr/local/lib/moodle-addons.php "$INSTALL_DIR" "$PREVIOUS_DIR")
+    if ! addons=$(php /usr/local/lib/moodle-addons.php "$INSTALL_DIR" "$PREVIOUS_DIR"); then
+        log "ERROR: could not tell which plugins of the previous code are add-ons"
+        log "The previous code is intact in ${PREVIOUS_DIR}. Fix the cause named above"
+        log "and start again; do not roll back to the previous image, which ignores it"
+        exit 1
+    fi
     if [ -n "$addons" ]; then
         printf '%s\n' "$addons" | while IFS= read -r addon; do
             log "Keeping add-on plugin ${addon}"

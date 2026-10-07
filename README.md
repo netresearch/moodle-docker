@@ -252,7 +252,9 @@ The entrypoint:
 - replaces the code in the code volume with the sources from the image, so files
   the new version deleted do not stay behind
 - carries over add-on plugins from the previous code; anything else you changed
-  in the code volume outside a plugin directory is not kept
+  in the code volume outside a plugin directory is not kept. This needs previous
+  code from Moodle 5.1 or later, and no directory mounted below `/var/www/html`;
+  otherwise the container stops with an error before it changes anything
 - regenerates `config.php`
 - runs `admin/cli/upgrade.php` unless `MOODLE_AUTO_UPGRADE=false`
 
