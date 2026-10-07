@@ -54,8 +54,12 @@ RUN apk add --no-cache $RUNTIME_DEPS $BUILD_DEPS \
 # the build. Take the commit from `git ls-remote <repo> refs/tags/v<version>^{}`
 # and cross-check it against the githash in Moodle's own release metadata at
 # download.moodle.org/api/1.3/updates.php.
-ARG MOODLE_VERSION=5.2.3
-ARG MOODLE_COMMIT=344232c15336c71b80f9aca8359ce0e0a9f3d116
+#
+# version.php names a first release by its branch alone: v5.3.0 carries
+# release '5.3 (Build: ...)', v5.3.1 carries '5.3.1 (Build: ...)'. Hence the
+# trailing ".0" is stripped before the release string is compared.
+ARG MOODLE_VERSION=5.3.0
+ARG MOODLE_COMMIT=42622298fe06f9626d988d60b2bf589bd8f850e8
 ENV MOODLE_VERSION=${MOODLE_VERSION}
 
 RUN git clone --depth 1 --branch "v${MOODLE_VERSION}" \
@@ -66,7 +70,7 @@ RUN git clone --depth 1 --branch "v${MOODLE_VERSION}" \
           exit 1; \
        fi \
     && rm -rf /opt/moodle-dist/.git \
-    && grep -q "release  = '${MOODLE_VERSION}" /opt/moodle-dist/public/version.php \
+    && grep -qF "release  = '${MOODLE_VERSION%.0} (" /opt/moodle-dist/public/version.php \
     && echo "${MOODLE_VERSION}" > /opt/moodle-dist/.moodle-version
 
 # Moodle ships a composer manifest and reports "Composer installed data not
@@ -130,7 +134,8 @@ RUN echo '#!/bin/sh' > /usr/local/bin/php-fpm-healthcheck \
 RUN mkdir -p /var/www/html /var/moodledata \
     && chown -R www-data:www-data /var/www/html /var/moodledata
 
-# Copy entrypoint script
+# Copy entrypoint script, and the helper it uses to find add-on plugins
+COPY moodle-addons.php /usr/local/lib/moodle-addons.php
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

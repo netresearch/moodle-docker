@@ -56,7 +56,7 @@
       "addLabels": ["deps-no-automerge"]
     },
     {
-      "description": "Moodle 5.2 supports PHP 8.3 and 8.4; 8.5 is development-only until Moodle 5.3 (MDL-84684), and docker-build.yml asserts 8.4. Lift this together with the Moodle upgrade that supports 8.5",
+      "description": "Moodle 5.3 supports PHP 8.3 and 8.4; its PHP policy still lists 8.5 as incomplete and for development only (MDL-84684), and docker-build.yml asserts 8.4. Lift this together with the Moodle release that supports 8.5",
       "matchManagers": ["dockerfile"],
       "matchPackageNames": ["php"],
       "allowedVersions": "<8.5"

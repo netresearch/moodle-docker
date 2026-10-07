@@ -66,6 +66,30 @@ entrypoint copies them into the code volume and runs
 `admin/cli/upgrade.php --non-interactive` itself; a failure aborts the
 entrypoint rather than serving a half-upgraded site.
 
+**A new version replaces the code, it is never copied over it.** Moodle's
+upgrade refuses to run while files the new version deleted are still on disk
+("Mixed Moodle versions detected", `upgrade_stale_php_files_present()` in
+`public/lib/upgradelib.php`). An overlay copy passes a patch upgrade and fails every
+major one; 5.2.3 to 5.3.0 failed this way. The old tree is moved to
+`.moodle-previous` in the code volume, and `moodle-addons.php` decides which of
+its plugin directories are add-ons to carry over: absent from the new sources
+and not listed as `standard` in the OLD tree's `lib/plugins.json`. The
+`deleted` list is the wrong test: it names core plugins removed long ago, such
+as `mod_chat`, which a site may have installed again as an add-on. Test an
+upgrade on volumes filled by the previous image with an add-on registered in
+the database - a fresh install never takes this path, and a lost add-on shows
+up only in `admin/cli/uninstall_plugins.php --show-missing` (or as "to be
+deleted" when its name is on the `deleted` list).
+
+Code from before 5.1 (a root `lib/` but no `public/version.php`) and a
+directory mounted below `/var/www/html` are refused before anything moves; the
+volume stays as it was. When `moodle-addons.php` refuses later, after the swap
+(no `lib/plugins.json` in the old tree), every start stops at that point with
+the old code intact in `.moodle-previous`. The way out is to fix the cause and
+start the same image again. Rolling back to the previous image does not help:
+its entrypoint ignores `.moodle-previous` and copies its own sources over the
+new ones.
+
 **"There is a newer Moodle version available: 5.2.3+" is not an error.** The
 notice names the version on offer, not the installed one. The `+` marks a
 weekly build of the stable branch after the release tag: `v5.2.3` carries
