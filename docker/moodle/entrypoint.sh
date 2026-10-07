@@ -55,6 +55,16 @@ install_moodle() {
         exit 1
     fi
 
+    # Code from before Moodle 5.1 keeps its plugins at the root, not under
+    # public/, so moodle-addons.php could not find its add-ons. Refuse while
+    # the volume is still untouched rather than after the swap.
+    if [ ! -d "$PREVIOUS_DIR" ] && [ ! -d "${PREVIOUS_DIR}.partial" ] \
+        && [ -d "${INSTALL_DIR}/lib" ] && [ ! -f "${INSTALL_DIR}/public/version.php" ]; then
+        log "ERROR: the code volume holds Moodle code from before 5.1 (no public/version.php)"
+        log "Its add-ons cannot be told apart automatically - move them to the new layout by hand"
+        exit 1
+    fi
+
     # The old tree is about to be moved and deleted. A directory mounted into
     # it from the host would be emptied on the host by that delete, so refuse.
     local mounts
