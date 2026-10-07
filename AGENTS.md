@@ -69,14 +69,17 @@ entrypoint rather than serving a half-upgraded site.
 **A new version replaces the code, it is never copied over it.** Moodle's
 upgrade refuses to run while files the new version deleted are still on disk
 ("Mixed Moodle versions detected", `upgrade_stale_php_files_present()` in
-`lib/upgradelib.php`). An overlay copy passes a patch upgrade and fails every
+`public/lib/upgradelib.php`). An overlay copy passes a patch upgrade and fails every
 major one; 5.2.3 to 5.3.0 failed this way. The old tree is moved to
 `.moodle-previous` in the code volume, and `moodle-addons.php` decides which of
 its plugin directories are add-ons to carry over: absent from the new sources
-and not on the `deleted` list in `lib/plugins.json`. Test an upgrade on volumes
-filled by the previous image with an add-on registered in the database - a
-fresh install never takes this path, and only
-`admin/cli/uninstall_plugins.php --show-missing` shows a lost add-on.
+and not listed as `standard` in the OLD tree's `lib/plugins.json`. The
+`deleted` list is the wrong test: it names core plugins removed long ago, such
+as `mod_chat`, which a site may have installed again as an add-on. Test an
+upgrade on volumes filled by the previous image with an add-on registered in
+the database - a fresh install never takes this path, and a lost add-on shows
+up only in `admin/cli/uninstall_plugins.php --show-missing` (or as "to be
+deleted" when its name is on the `deleted` list).
 
 **"There is a newer Moodle version available: 5.2.3+" is not an error.** The
 notice names the version on offer, not the installed one. The `+` marks a

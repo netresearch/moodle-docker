@@ -70,6 +70,11 @@ install_moodle() {
         log "Resuming an interrupted installation, the previous code tree is still set aside"
     fi
 
+    # Exists from here until the copy is complete, on a fresh volume too: the
+    # sources carry .moodle-version, so an interrupted copy can already hold
+    # the new marker, and only this directory tells the next start to resume.
+    mkdir -p "$PREVIOUS_DIR"
+
     # Anything left next to the set-aside tree is a partial copy from an
     # interrupted run.
     find "$INSTALL_DIR" -mindepth 1 -maxdepth 1 \
@@ -78,18 +83,16 @@ install_moodle() {
 
     cp -a "${DIST_DIR}/." "$INSTALL_DIR/"
 
-    if [ -d "$PREVIOUS_DIR" ]; then
-        local addons
-        addons=$(php /usr/local/lib/moodle-addons.php "$INSTALL_DIR" "$PREVIOUS_DIR")
-        if [ -n "$addons" ]; then
-            printf '%s\n' "$addons" | while IFS= read -r addon; do
-                log "Keeping add-on plugin ${addon}"
-                mkdir -p "$(dirname "${INSTALL_DIR}/${addon}")"
-                cp -a "${PREVIOUS_DIR}/${addon}" "${INSTALL_DIR}/${addon}"
-            done
-        else
-            log "No add-on plugins in the previous code tree"
-        fi
+    local addons
+    addons=$(php /usr/local/lib/moodle-addons.php "$INSTALL_DIR" "$PREVIOUS_DIR")
+    if [ -n "$addons" ]; then
+        printf '%s\n' "$addons" | while IFS= read -r addon; do
+            log "Keeping add-on plugin ${addon}"
+            mkdir -p "$(dirname "${INSTALL_DIR}/${addon}")"
+            cp -a "${PREVIOUS_DIR}/${addon}" "${INSTALL_DIR}/${addon}"
+        done
+    else
+        log "No add-on plugins in the previous code tree"
     fi
 
     # Mark installed version. The sources carry the same file, so it is only
@@ -98,9 +101,7 @@ install_moodle() {
 
     # Renamed first: a half-deleted tree under the old name would be taken for
     # an interrupted swap on the next start and its remains restored.
-    if [ -d "$PREVIOUS_DIR" ]; then
-        mv "$PREVIOUS_DIR" "${PREVIOUS_DIR}.obsolete"
-    fi
+    mv "$PREVIOUS_DIR" "${PREVIOUS_DIR}.obsolete"
     rm -rf "${PREVIOUS_DIR}.obsolete"
 
     log "Moodle ${version} installed successfully"
