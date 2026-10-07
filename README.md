@@ -1,14 +1,14 @@
-# Moodle 5.2 Docker Stack
+# Moodle 5.3 Docker Stack
 
 [![Docker Build](https://github.com/netresearch/moodle-docker/actions/workflows/docker-build.yml/badge.svg)](https://github.com/netresearch/moodle-docker/actions/workflows/docker-build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Moodle](https://img.shields.io/badge/Moodle-5.2-orange.svg)](https://moodle.org/)
+[![Moodle](https://img.shields.io/badge/Moodle-5.3-orange.svg)](https://moodle.org/)
 [![PHP](https://img.shields.io/badge/PHP-8.4-blue.svg)](https://www.php.net/)
 [![nginx](https://img.shields.io/badge/nginx-1.31-green.svg)](https://nginx.org/)
 [![MariaDB](https://img.shields.io/badge/MariaDB-12.3%20hardened-blue.svg)](https://mariadb.org/)
 [![Valkey](https://img.shields.io/badge/Valkey-9-red.svg)](https://valkey.io/)
 
-Production-ready Docker Compose stack for Moodle 5.2 LMS with PHP 8.4 (PHP-FPM),
+Production-ready Docker Compose stack for Moodle 5.3 LMS with PHP 8.4 (PHP-FPM),
 nginx 1.31, MariaDB 12.3 (Docker Hardened Image), and Valkey 9.
 
 ## Key Features
@@ -27,7 +27,7 @@ nginx 1.31, MariaDB 12.3 (Docker Hardened Image), and Valkey 9.
 
 ```
                               ┌─────────────────────────────────────────────────┐
-                              │           Moodle 5.2 Docker Stack               │
+                              │           Moodle 5.3 Docker Stack               │
                               ├─────────────────────────────────────────────────┤
                               │                                                 │
         HTTP/HTTPS/QUIC       │  ┌────────────────────────────────────────┐    │
@@ -152,7 +152,7 @@ All configuration is done via environment variables in `.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DB_TYPE` | `mariadb` | Database type (`mariadb` or `pgsql`) |
+| `DB_TYPE` | `mariadb` | Database type (`mariadb` or `pgsql`). The stack ships MariaDB only; an external PostgreSQL must be 17 or later for Moodle 5.3 |
 | `DB_HOST` | `database` | Database hostname |
 | `DB_NAME` | `moodle` | Database name |
 | `DB_USER` | `moodle` | Database user |
@@ -198,7 +198,7 @@ The build pins the upstream commit, so a version bump needs both values. Resolve
 the tag and cross-check it against Moodle's own release metadata:
 
 Replace `<version>` below with the release you are moving to, for example
-`5.2.4` once it is published:
+`5.3.1` once it is published:
 
 ```bash
 # Commit the tag points at
@@ -207,8 +207,10 @@ git ls-remote https://github.com/moodle/moodle.git "refs/tags/v<version>^{}"
 # Cross-check against Moodle's own release metadata: githash must match the
 # first characters of the commit above. `version` and `branch` describe the
 # release you are coming FROM - the API answers with what is newer than that.
-curl -s "https://download.moodle.org/api/1.3/updates.php?version=2026042003&branch=5.2&format=json" \
-  | grep -o '"release":"<version>[^}]*githash":"[^"]*"'
+# The metadata names a first release without ".0" ("5.4", not "5.4.0"), and
+# norelease_index_info carries the weekly build, not the release.
+curl -s "https://download.moodle.org/api/1.3/updates.php?version=2026100500&branch=5.3&format=json" \
+  | jq -r '.updates.core[].release_index_info | select(.version == "<version>") | .githash'
 ```
 
 ```bash

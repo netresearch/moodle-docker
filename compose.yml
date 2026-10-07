@@ -1,4 +1,4 @@
-# Moodle 5.2 Production Stack
+# Moodle 5.3 Production Stack
 # PHP-FPM + nginx + MariaDB 12.3 (hardened) + Valkey 9 + Ofelia + Mailpit
 
 services:

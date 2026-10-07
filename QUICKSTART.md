@@ -1,4 +1,4 @@
-# Moodle 5.2 Quick Start
+# Moodle 5.3 Quick Start
 
 Get Moodle running in under 5 minutes.
 
@@ -89,7 +89,7 @@ To upgrade to a new Moodle version:
 
 1. Edit `.env` and change `MOODLE_VERSION`:
    ```env
-   MOODLE_VERSION=5.2.4
+   MOODLE_VERSION=5.3.1
    ```
 
 2. Rebuild the image and restart the stack. The sources ship inside the image,
