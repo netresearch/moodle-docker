@@ -249,8 +249,10 @@ docker compose exec moodle php /var/www/html/admin/cli/maintenance.php --disable
 
 The entrypoint:
 - refuses to start when `MOODLE_VERSION` and the version in the image disagree
-- copies the new sources out of the image into the code volume
-- preserves any custom plugins you have installed
+- replaces the code in the code volume with the sources from the image, so files
+  the new version deleted do not stay behind
+- carries over add-on plugins from the previous code; anything else you changed
+  in the code volume outside a plugin directory is not kept
 - regenerates `config.php`
 - runs `admin/cli/upgrade.php` unless `MOODLE_AUTO_UPGRADE=false`
 

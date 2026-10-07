@@ -134,7 +134,8 @@ RUN echo '#!/bin/sh' > /usr/local/bin/php-fpm-healthcheck \
 RUN mkdir -p /var/www/html /var/moodledata \
     && chown -R www-data:www-data /var/www/html /var/moodledata
 
-# Copy entrypoint script
+# Copy entrypoint script, and the helper it uses to find add-on plugins
+COPY moodle-addons.php /usr/local/lib/moodle-addons.php
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

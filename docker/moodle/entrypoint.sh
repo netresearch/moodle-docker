@@ -30,44 +30,20 @@ fi
 # Moodle Download and Installation
 # =============================================================================
 
-backup_user_plugins() {
-    log "Backing up user plugins..."
-    mkdir -p /tmp/plugins_backup
+# Where the previous code tree waits while the new one is installed. It sits in
+# the code volume, so a restart mid-swap finds it again, and outside public/,
+# so nginx never serves it. Moving the old tree here is not atomic, so it
+# happens under the .partial name and is renamed once complete.
+PREVIOUS_DIR="${INSTALL_DIR}/.moodle-previous"
 
-    # Plugin directories that may contain user additions
-    local plugin_types="mod local blocks theme auth enrol report question format"
-
-    for ptype in $plugin_types; do
-        local src_dir="$INSTALL_DIR/$ptype"
-        if [ -d "$src_dir" ]; then
-            mkdir -p "/tmp/plugins_backup/$ptype"
-            # Copy all plugins (we'll filter core vs user later if needed)
-            cp -r "$src_dir"/* "/tmp/plugins_backup/$ptype/" 2>/dev/null || true
-        fi
-    done
-
-    log "Plugin backup complete"
-}
-
-restore_user_plugins() {
-    log "Restoring user plugins..."
-
-    local plugin_types="mod local blocks theme auth enrol report question format"
-
-    for ptype in $plugin_types; do
-        local backup_dir="/tmp/plugins_backup/$ptype"
-        local dest_dir="$INSTALL_DIR/$ptype"
-
-        if [ -d "$backup_dir" ]; then
-            # Use cp -n to not overwrite existing (core) plugins
-            cp -rn "$backup_dir"/* "$dest_dir/" 2>/dev/null || true
-        fi
-    done
-
-    rm -rf /tmp/plugins_backup
-    log "Plugin restore complete"
-}
-
+# Install the sources baked into the image.
+#
+# A new version replaces the code tree rather than being copied over it.
+# Files the new version deleted would otherwise stay behind, and Moodle's
+# upgrade refuses to run next to them ("Mixed Moodle versions detected") -
+# for a major upgrade it never gets past that. Add-on plugins and config.php
+# are the only parts of the old tree that are not Moodle's own; the add-ons
+# are carried over, config.php is generated afresh anyway.
 install_moodle() {
     local version="$1"
 
@@ -79,21 +55,53 @@ install_moodle() {
         exit 1
     fi
 
-    # Backup existing plugins if upgrading
-    if [ -d "$INSTALL_DIR/lib" ]; then
-        backup_user_plugins
+    # Set the old tree aside, or finish setting it aside after an interruption.
+    if [ -d "${PREVIOUS_DIR}.partial" ] \
+        || { [ ! -d "$PREVIOUS_DIR" ] && [ -d "${INSTALL_DIR}/lib" ]; }; then
+        log "Moving the previous code tree aside..."
+        mkdir -p "${PREVIOUS_DIR}.partial"
+        find "$INSTALL_DIR" -mindepth 1 -maxdepth 1 \
+            ! -name "$(basename "$PREVIOUS_DIR").partial" \
+            ! -name "$(basename "$PREVIOUS_DIR")" \
+            ! -name "$(basename "$PREVIOUS_DIR").obsolete" \
+            -exec mv -t "${PREVIOUS_DIR}.partial/" {} +
+        mv "${PREVIOUS_DIR}.partial" "$PREVIOUS_DIR"
+    elif [ -d "$PREVIOUS_DIR" ]; then
+        log "Resuming an interrupted installation, the previous code tree is still set aside"
     fi
 
-    # Copy the baked-in sources over the code volume
+    # Anything left next to the set-aside tree is a partial copy from an
+    # interrupted run.
+    find "$INSTALL_DIR" -mindepth 1 -maxdepth 1 \
+        ! -name "$(basename "$PREVIOUS_DIR")" \
+        -exec rm -rf {} +
+
     cp -a "${DIST_DIR}/." "$INSTALL_DIR/"
 
-    # Restore user plugins if we had any
-    if [ -d "/tmp/plugins_backup" ]; then
-        restore_user_plugins
+    if [ -d "$PREVIOUS_DIR" ]; then
+        local addons
+        addons=$(php /usr/local/lib/moodle-addons.php "$INSTALL_DIR" "$PREVIOUS_DIR")
+        if [ -n "$addons" ]; then
+            printf '%s\n' "$addons" | while IFS= read -r addon; do
+                log "Keeping add-on plugin ${addon}"
+                mkdir -p "$(dirname "${INSTALL_DIR}/${addon}")"
+                cp -a "${PREVIOUS_DIR}/${addon}" "${INSTALL_DIR}/${addon}"
+            done
+        else
+            log "No add-on plugins in the previous code tree"
+        fi
     fi
 
-    # Mark installed version
+    # Mark installed version. The sources carry the same file, so it is only
+    # rewritten here to make the marker explicit.
     echo "$version" > "$VERSION_FILE"
+
+    # Renamed first: a half-deleted tree under the old name would be taken for
+    # an interrupted swap on the next start and its remains restored.
+    if [ -d "$PREVIOUS_DIR" ]; then
+        mv "$PREVIOUS_DIR" "${PREVIOUS_DIR}.obsolete"
+    fi
+    rm -rf "${PREVIOUS_DIR}.obsolete"
 
     log "Moodle ${version} installed successfully"
 }
@@ -407,9 +415,14 @@ if [ "$MOODLE_VERSION" != "$IMAGE_VERSION" ]; then
 fi
 
 # Install/upgrade Moodle if needed
-if [ "$INSTALLED_VERSION" != "$MOODLE_VERSION" ]; then
+# A set-aside tree means an earlier installation was interrupted.
+if [ "$INSTALLED_VERSION" != "$MOODLE_VERSION" ] \
+    || [ -d "$PREVIOUS_DIR" ] || [ -d "${PREVIOUS_DIR}.partial" ]; then
     install_moodle "$MOODLE_VERSION"
 fi
+
+# Left over when a start died while deleting the set-aside tree
+rm -rf "${PREVIOUS_DIR}.obsolete"
 
 # A volume from an older image can be missing vendor/
 ensure_vendor
