@@ -81,11 +81,14 @@ the database - a fresh install never takes this path, and a lost add-on shows
 up only in `admin/cli/uninstall_plugins.php --show-missing` (or as "to be
 deleted" when its name is on the `deleted` list).
 
-When `moodle-addons.php` refuses (code from before 5.1, no `lib/plugins.json`
-in the old tree), every start stops at that point with the old code intact in
-`.moodle-previous`. The way out is to fix the cause and start the same image
-again. Rolling back to the previous image does not help: its entrypoint
-ignores `.moodle-previous` and copies its own sources over the new ones.
+Code from before 5.1 (a root `lib/` but no `public/version.php`) and a
+directory mounted below `/var/www/html` are refused before anything moves; the
+volume stays as it was. When `moodle-addons.php` refuses later, after the swap
+(no `lib/plugins.json` in the old tree), every start stops at that point with
+the old code intact in `.moodle-previous`. The way out is to fix the cause and
+start the same image again. Rolling back to the previous image does not help:
+its entrypoint ignores `.moodle-previous` and copies its own sources over the
+new ones.
 
 **"There is a newer Moodle version available: 5.2.3+" is not an error.** The
 notice names the version on offer, not the installed one. The `+` marks a
