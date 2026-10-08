@@ -59,6 +59,14 @@ in two places and only work together — with the flag off the router prefixes
 its own base path with `/r.php` and an unprefixed request no longer matches,
 so the rewrite alone answers 404.
 
+**A file extension does not mean a file.** Since 5.3 Moodle serves its ES
+modules through the router under `.js` paths (`/core/esm/<rev>/bootstrap/bootstrap.js`),
+so the static-file location must fall back to `r.php` too, never to `=404`.
+With `=404` every page still loads its HTML while bootstrap, the design system
+and the navigation fail - visible only in the browser console, not in a status
+check of the page. The "Test that module URLs reach the router" step in CI
+guards this.
+
 ## Upgrades
 
 The Moodle sources ship inside the image, so an upgrade is a new image. The

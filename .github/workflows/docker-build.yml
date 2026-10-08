@@ -350,6 +350,32 @@ jobs:
             exit 1
           fi
 
+      # Moodle 5.3 serves its ES modules through the router, under .js paths
+      # that are not files. nginx has to hand those to PHP; answering them with
+      # its own 404 breaks the JavaScript on every page while the HTML still
+      # loads, so the check above cannot see it. X-Powered-By tells who
+      # answered - the status alone does not.
+      - name: Test that module URLs reach the router
+        run: |
+          module=$(curl -s -o /dev/null -D - http://localhost/core/esm/0/bootstrap/bootstrap.js)
+          echo "$module"
+          if ! echo "$module" | grep -qi '^x-powered-by: PHP'; then
+            echo "A .js path that is not a file was not handed to PHP"
+            exit 1
+          fi
+          static=$(curl -s -o /dev/null -D - http://localhost/lib/requirejs/require.min.js)
+          echo "$static"
+          # nginx's own 404 carries no X-Powered-By either, so the status
+          # has to be checked too.
+          if ! echo "$static" | head -n 1 | grep -q ' 200'; then
+            echo "A real static file did not answer 200"
+            exit 1
+          fi
+          if echo "$static" | grep -qi '^x-powered-by'; then
+            echo "A real static file went to PHP instead of being served by nginx"
+            exit 1
+          fi
+
       - name: Test database connection
         run: |
           docker compose exec -T database mariadb -uroot -ptest_root_456 -e "SHOW DATABASES;" | grep -q "moodle"
