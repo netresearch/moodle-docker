@@ -87,6 +87,9 @@ RUN composer install --no-dev --classmap-authoritative --no-interaction --no-pro
 WORKDIR /
 
 # PHP configuration for Moodle
+# Moodle sets session.use_strict_mode to 0 for its own sessions at runtime
+# (core\session\manager, "custom protection in session init"); the value here
+# covers everything PHP does before Moodle's code runs, request parsing included.
 RUN { \
     echo 'memory_limit = 256M'; \
     echo 'upload_max_filesize = 100M'; \
@@ -95,6 +98,7 @@ RUN { \
     echo 'max_input_vars = 5000'; \
     echo 'file_uploads = On'; \
     echo 'session.save_handler = files'; \
+    echo 'session.use_strict_mode = 1'; \
     echo 'display_errors = Off'; \
     echo 'zend.exception_ignore_args = On'; \
     echo 'log_errors = On'; \
