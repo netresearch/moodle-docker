@@ -18,8 +18,10 @@ ARG RUNTIME_DEPS="bash curl git unzip \
     oniguruma postgresql-libs libldap libbz2 \
     fcgi"
 
-# Install dependencies and PHP extensions
-RUN apk add --no-cache $RUNTIME_DEPS $BUILD_DEPS \
+# Install dependencies and PHP extensions; the PECL ones with PIE from Packagist,
+# since pecl.php.net is deprecated and its downloads fail
+RUN --mount=type=bind,from=ghcr.io/php/pie:1.5.2-bin@sha256:a254c78b51ca34daef0541fa1cf0147385c93ba5ca799868392275d947f00fe7,source=/pie,target=/usr/local/bin/pie \
+    apk add --no-cache $RUNTIME_DEPS $BUILD_DEPS \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-configure ldap \
     && docker-php-ext-install -j"$(nproc)" \
@@ -37,7 +39,7 @@ RUN apk add --no-cache $RUNTIME_DEPS $BUILD_DEPS \
         exif \
         sockets \
         pcntl \
-    && pecl install redis igbinary apcu \
+    && pie install --no-interaction phpredis/phpredis "igbinary/igbinary:^3.2@RC" apcu/apcu \
     && docker-php-ext-enable redis igbinary apcu \
     && apk del $BUILD_DEPS \
     && rm -rf /tmp/* /var/cache/apk/*
