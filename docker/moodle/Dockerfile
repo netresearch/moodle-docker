@@ -88,9 +88,10 @@ WORKDIR /
 
 # PHP configuration for Moodle
 # Moodle sets session.use_strict_mode to 0 for its own sessions at runtime
-# (core\session\manager, "custom protection in session init"). The value here
-# still applies to the session PHP opens itself before any script runs: the
-# upload-progress tracking while it parses a multipart request.
+# (core\session\manager, "custom protection in session init"). Upload progress
+# is off: it made PHP open a session while parsing a multipart request, before
+# any script runs, which is the path php2shell (CVE-2026-109618/109619) used.
+# Moodle does not use it.
 RUN { \
     echo 'memory_limit = 256M'; \
     echo 'upload_max_filesize = 100M'; \
@@ -100,6 +101,7 @@ RUN { \
     echo 'file_uploads = On'; \
     echo 'session.save_handler = files'; \
     echo 'session.use_strict_mode = 1'; \
+    echo 'session.upload_progress.enabled = 0'; \
     echo 'display_errors = Off'; \
     echo 'zend.exception_ignore_args = On'; \
     echo 'log_errors = On'; \
