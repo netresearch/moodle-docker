@@ -75,13 +75,16 @@ jobs:
           fi
           echo "No leaked secrets detected"
 
-  build-moodle-image:
-    name: Build Moodle Image
+  # The checks below run against images built from docker-bake.hcl, the same
+  # definition the `publish` job pushes. They read the GHA cache that `publish`
+  # writes per target (scope = target name) and skip it on the weekly rebuild,
+  # so that they check the image that run publishes.
+  test-moodle-image:
+    name: Test Moodle Image
     runs-on: ubuntu-latest
     needs: validate-compose
     permissions:
       contents: read
-      packages: write
 
     steps:
       - name: Checkout code
@@ -90,50 +93,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
-      - name: Log in to GitHub Container Registry
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+      - name: Build test image
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata for Docker
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
-        with:
-          images: ghcr.io/${{ github.repository }}/moodle
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=sha-,enable=${{ github.event_name != 'pull_request' }}
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build Moodle image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: ./docker/moodle
-          file: ./docker/moodle/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # The weekly run exists to pick up a rebuilt base image and current
-          # Alpine packages. With the layer cache on, every layer is restored
-          # from the previous build and the same image is published again.
+          source: .
+          files: docker-bake.hcl
+          targets: moodle-test
           no-cache: ${{ github.event_name == 'schedule' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build test image for validation
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: ./docker/moodle
-          file: ./docker/moodle/Dockerfile
-          load: true
-          tags: moodle:test
-          cache-from: type=gha
+          set: moodle-test.cache-from=type=gha,scope=moodle
 
       - name: Verify PHP version
         run: |
@@ -180,13 +147,12 @@ jobs:
             exit 1
           fi
 
-  build-nginx-image:
-    name: Build Nginx Image
+  test-nginx-image:
+    name: Test Nginx Image
     runs-on: ubuntu-latest
     needs: validate-compose
     permissions:
       contents: read
-      packages: write
 
     steps:
       - name: Checkout code
@@ -195,48 +161,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
-      - name: Log in to GitHub Container Registry
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+      - name: Build test image
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata for Docker
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
-        with:
-          images: ghcr.io/${{ github.repository }}/moodle-nginx
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=sha-,enable=${{ github.event_name != 'pull_request' }}
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build Nginx image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: ./docker/nginx
-          file: ./docker/nginx/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # Same reason as for the Moodle image.
+          source: .
+          files: docker-bake.hcl
+          targets: nginx-test
           no-cache: ${{ github.event_name == 'schedule' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build test image for validation
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
-        with:
-          context: ./docker/nginx
-          file: ./docker/nginx/Dockerfile
-          load: true
-          tags: moodle-nginx:test
-          cache-from: type=gha
+          set: nginx-test.cache-from=type=gha,scope=nginx
 
       - name: Verify Nginx configuration
         run: |
@@ -260,7 +192,7 @@ jobs:
   test-stack-startup:
     name: Test Stack Startup
     runs-on: ubuntu-latest
-    needs: [build-moodle-image, build-nginx-image]
+    needs: [test-moodle-image, test-nginx-image]
     # Pull requests from forks cannot read repository secrets, so they could
     # never pull the hardened database image. Skip rather than fail them.
     if: >-
@@ -423,36 +355,56 @@ jobs:
         run: |
           docker compose down -v
 
-  security-scan:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    needs: [build-moodle-image, build-nginx-image]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Build Moodle image
-        run: docker build -t moodle:scan ./docker/moodle
-
-      - name: Build Nginx image
-        run: docker build -t moodle-nginx:scan ./docker/nginx
-
-      - name: Run Trivy on Moodle image
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: 'moodle:scan'
-          format: 'table'
-          exit-code: '0'  # Don't fail on vulnerabilities (informational only)
-          severity: 'CRITICAL,HIGH'
-
-      - name: Run Trivy on Nginx image
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: 'moodle-nginx:scan'
-          format: 'table'
-          exit-code: '0'  # Don't fail on vulnerabilities (informational only)
-          severity: 'CRITICAL,HIGH'
+  # Builds both images from docker-bake.hcl through the shared reusable and
+  # pushes them only after the checks above passed. On a pull request it loads
+  # them instead of pushing, so Trivy can still scan them. Trivy is
+  # report-only: findings go to code scanning and do not fail the run.
+  publish:
+    name: Build and Push
+    needs: [test-moodle-image, test-nginx-image, test-stack-startup]
+    # test-stack-startup is skipped on fork pull requests; a skipped job must
+    # not skip this one.
+    if: ${{ !failure() && !cancelled() }}
+    uses: netresearch/.github/.github/workflows/build-container-bake.yml@main
+    # security-events: write is consumed by the Trivy SARIF upload, and the
+    # reusable's job declares all four: a caller granting less cannot start it.
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write
+    with:
+      bake-file: docker-bake.hcl
+      # The pre-build-command sets the tag variables in the runner, which only
+      # a local build context sees.
+      bake-source: "."
+      targets: moodle,nginx
+      push: ${{ github.event_name != 'pull_request' }}
+      load: ${{ github.event_name == 'pull_request' }}
+      scan: true
+      # The weekly run exists to pick up a rebuilt base image and current
+      # Alpine packages. With the layer cache on, every layer is restored
+      # from the previous build and the same image is published again.
+      cache: ${{ github.event_name != 'schedule' }}
+      # Tags as before the move to bake: branch name (pr-<n> on a pull
+      # request), sha-<7 characters> and latest on main.
+      pre-build-command: |
+        if [[ "$GITHUB_REF" == refs/pull/* ]]; then
+          ref_tag="pr-$(cut -d/ -f3 <<< "$GITHUB_REF")"
+          sha=""
+        else
+          ref_tag="$(sed 's/[^A-Za-z0-9._-]/-/g' <<< "$GITHUB_REF_NAME")"
+          sha="$GITHUB_SHA"
+        fi
+        latest=false
+        if [[ "$GITHUB_REF" == refs/heads/main ]]; then
+          latest=true
+        fi
+        {
+          echo "REF_TAG=$ref_tag"
+          echo "GIT_SHA=$sha"
+          echo "LATEST=$latest"
+        } >> "$GITHUB_ENV"
 
   # Markdown lint via the org's shared reusable, so the pinned action is
   # maintained centrally. Scope + blocking behaviour preserved (root *.md,
