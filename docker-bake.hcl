@@ -8,9 +8,9 @@
 # sets the variables below in its pre-build-command; built locally they stay
 # empty and the images get no registry tags.
 #
-# No cache-from/cache-to here: the reusable adds the GHA cache and leaves it
-# out on the weekly rebuild, so that the base image and the Alpine packages are
-# fetched again. A cache declared here would still apply on that run.
+# No cache-from/cache-to here: the reusable adds a GHA cache per target
+# (scope = target name) and reads none on the weekly rebuild, so that the base
+# image and the Alpine packages are fetched again.
 
 variable "REGISTRY" {
   default = "ghcr.io"
