@@ -33,7 +33,7 @@ flowchart LR
         db[("<b>MariaDB</b><br/>database")]
         valkey[("<b>Valkey</b><br/>sessions, cache")]
         ofelia["<b>Ofelia</b><br/>cron scheduler"]
-        mailpit["<b>Mailpit</b><br/>dev profile only"]
+        mailpit["<b>Mailpit</b><br/>dev or mail profile"]
     end
 
     client -- "80/443<br/>HTTP/HTTPS/QUIC" --> nginx
@@ -54,7 +54,7 @@ flowchart LR
 | **MariaDB** | `compose.yml` | Docker Hardened Image, runs non-root (uid 65532) |
 | **Valkey** | `compose.yml` | Redis-compatible server for sessions and cache |
 | **Ofelia** | `compose.yml` | Docker-native cron scheduler for Moodle tasks, limited to the jobs of this stack |
-| **Mailpit** | `compose.yml` | Development mail catcher (optional, `dev` profile) |
+| **Mailpit** | `compose.yml` | Development mail catcher (optional, `dev` or `mail` profile) |
 
 ## Prerequisites
 
