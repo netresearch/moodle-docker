@@ -19,17 +19,15 @@
       "extractVersionTemplate": "^v(?<version>.+)$"
     },
     {
-      "description": "Every other place that states the Moodle release: compose defaults, .env.example, CI env, README",
+      "description": "Every other place that states the Moodle release: compose defaults, .env.example, CI env",
       "customType": "regex",
       "managerFilePatterns": [
         "/^compose\\.yml$/",
         "/^\\.env\\.example$/",
-        "/^\\.github/workflows/docker-build\\.yml$/",
-        "/^README\\.md$/"
+        "/^\\.github/workflows/docker-build\\.yml$/"
       ],
       "matchStrings": [
-        "MOODLE_VERSION(?:=|:-|: \")(?<currentValue>\\d+\\.\\d+\\.\\d+)",
-        "`MOODLE_VERSION` \\| `(?<currentValue>\\d+\\.\\d+\\.\\d+)`"
+        "MOODLE_VERSION(?:=|:-|: \")(?<currentValue>\\d+\\.\\d+\\.\\d+)"
       ],
       "depNameTemplate": "moodle/moodle",
       "datasourceTemplate": "github-tags",
@@ -60,6 +58,12 @@
       "matchManagers": ["dockerfile"],
       "matchPackageNames": ["php"],
       "allowedVersions": "<8.5"
+    },
+    {
+      "description": "Renovate cannot list the tags of dhi.io/mariadb (the lookup answers no-result), so the hardened MariaDB image was never checked. The Docker Hardened Image carries the upstream tags, so look them up on Docker Hub; compose.yml keeps pulling from dhi.io",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["dhi.io/mariadb"],
+      "overridePackageName": "mariadb"
     }
   ]
 }
