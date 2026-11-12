@@ -182,7 +182,10 @@ services:
     image: ghcr.io/netresearch/ofelia:1.0.1
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_ofelia
     restart: unless-stopped
-    command: daemon
+    # Ofelia reads job labels from every container the Docker socket shows.
+    # The filter limits it to this stack, so jobs of other stacks on the same
+    # host are neither run twice nor run where their own scheduler is off.
+    command: daemon --docker-filter label=com.docker.compose.project=${COMPOSE_PROJECT_NAME}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
