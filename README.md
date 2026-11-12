@@ -140,7 +140,7 @@ All configuration is done via environment variables in `.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MOODLE_VERSION` | the release in `docker/moodle/Dockerfile` | Moodle version baked into the image; changing it needs a rebuild |
+| `MOODLE_VERSION` | the release pinned in `.env.example`, `compose.yml` and `docker/moodle/Dockerfile` (Renovate keeps the three in step) | Moodle version baked into the image; changing it needs a rebuild |
 | `MOODLE_URL` | `http://localhost` | Full URL to your Moodle site (no trailing slash) |
 | `SSL_PROXY` | `false` | Set to `true` behind an SSL-terminating proxy; sets `$CFG->sslproxy` |
 | `REVERSE_PROXY` | `false` | Sets `$CFG->reverseproxy` for advanced load balancing or port forwarding; leave off for a plain TLS terminator |
@@ -197,9 +197,14 @@ image is built from the matching Git tag at https://github.com/moodle/moodle/tag
 The build pins the upstream commit, so a version bump needs both values. Resolve
 the tag and cross-check it against Moodle's own release metadata:
 
-Replace `<version>` below with the release you are moving to, `<branch>` with
-its major and minor version (`5.3` for any 5.3.x), and `<installed>` with the
-`$version` value from `public/version.php` of the release you are coming from:
+Replace the placeholders below:
+
+- `<version>`: the release you are moving to, as the Git tag names it (`5.4.0`)
+- `<release>`: the same release as the metadata names it, without a trailing
+  `.0` (`5.4` for `5.4.0`, unchanged for `5.4.1`)
+- `<installed>` and `<branch>`: the release you are coming from, as the
+  `$version` value from its `public/version.php` and its major and minor
+  version (`5.3` for any 5.3.x)
 
 ```bash
 # Commit the tag points at
@@ -211,7 +216,7 @@ git ls-remote https://github.com/moodle/moodle.git "refs/tags/v<version>^{}"
 # The metadata names a first release without ".0" ("5.4", not "5.4.0"), and
 # norelease_index_info carries the weekly build, not the release.
 curl -s "https://download.moodle.org/api/1.3/updates.php?version=<installed>&branch=<branch>&format=json" \
-  | jq -r '.updates.core[].release_index_info | select(.version == "<version>") | .githash'
+  | jq -r '.updates.core[].release_index_info | select(.version == "<release>") | .githash'
 ```
 
 ```bash
