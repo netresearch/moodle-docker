@@ -92,14 +92,19 @@ To upgrade to a new Moodle version:
    MOODLE_VERSION=5.3.2
    ```
 
-2. Rebuild the image and restart the stack. The sources ship inside the image,
+2. Set `ARG MOODLE_VERSION` and `ARG MOODLE_COMMIT` in
+   `docker/moodle/Dockerfile` to the new release. The build checks out the
+   tag and stops with "commit mismatch" when it does not match the pinned
+   commit. The README section
+   [Update Version and Commit Pin](README.md#2-update-version-and-commit-pin)
+   shows how to resolve the commit.
+
+3. Rebuild the image and restart the stack. The sources ship inside the image,
    so a rebuild is required — without it the container refuses to start:
    ```bash
    docker compose build moodle
    docker compose up -d
    ```
-
-The new version will be downloaded automatically.
 
 ---
 
