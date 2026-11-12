@@ -23,40 +23,25 @@ under [Components](#components), and Renovate keeps those pins current.
 
 ## Architecture
 
-```
-                              ┌─────────────────────────────────────────────────┐
-                              │             Moodle Docker Stack                 │
-                              ├─────────────────────────────────────────────────┤
-                              │                                                 │
-        HTTP/HTTPS/QUIC       │  ┌────────────────────────────────────────┐    │
-      ───────────────────────►│  │           nginx                        │    │
-        (80/443)              │  │   HTTP/2 + HTTP/3 + Brotli             │    │
-                              │  │   Static files, SSL termination        │    │
-                              │  └──────────────────┬─────────────────────┘    │
-                              │                     │                           │
-                              │                     │ FastCGI (port 9000)       │
-                              │                     ▼                           │
-                              │  ┌──────────────────────────────────────────┐  │
-                              │  │              PHP-FPM                     │  │
-                              │  │   Moodle App (baked into the image)     │  │
-                              │  │   OPcache + JIT + Redis extension       │  │
-                              │  └──────┬───────────────────────┬──────────┘  │
-                              │         │                       │              │
-                              │  ┌──────┴──────┐         ┌──────┴──────┐      │
-                              │  │   MariaDB   │         │   Valkey    │      │
-                              │  │  Database   │         │  Sessions   │      │
-                              │  │             │         │  + Cache    │      │
-                              │  └─────────────┘         └─────────────┘      │
-                              │                                                 │
-                              │  ┌─────────────┐         ┌─────────────┐      │
-                              │  │  Moodle App │◄────────│   Ofelia    │      │
-                              │  │  (cron job) │  exec   │  Scheduler  │      │
-                              │  └─────────────┘         └─────────────┘      │
-                              │                                                 │
-                              │  ┌─────────────┐  (optional, dev profile)     │
-                              │  │   Mailpit   │  Mail catcher for testing    │
-                              │  └─────────────┘                               │
-                              └─────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    client(["Browser"])
+
+    subgraph stack["Moodle Docker Stack"]
+        nginx["<b>nginx</b><br/>HTTP/2, HTTP/3<br/>Brotli, TLS"]
+        php["<b>PHP-FPM</b><br/>Moodle in the image<br/>OPcache + JIT"]
+        db[("<b>MariaDB</b><br/>database")]
+        valkey[("<b>Valkey</b><br/>sessions, cache")]
+        ofelia["<b>Ofelia</b><br/>cron scheduler"]
+        mailpit["<b>Mailpit</b><br/>dev profile only"]
+    end
+
+    client -- "80/443<br/>HTTP/HTTPS/QUIC" --> nginx
+    nginx -- "FastCGI :9000" --> php
+    php --> db
+    php --> valkey
+    ofelia -. "exec cron.php<br/>every minute" .-> php
+    php -. "SMTP" .-> mailpit
 ```
 
 ## Components
