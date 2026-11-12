@@ -135,7 +135,7 @@ docker compose down -v
 | database | MariaDB           | (internal)          |
 | valkey   | Cache & sessions  | (internal)          |
 | ofelia   | Cron scheduler    | (internal)          |
-| mailpit  | Mail catcher (dev)| http://localhost/mailpit/ |
+| mailpit  | Mail catcher (`dev` or `mail` profile) | http://localhost/mailpit/ |
 
 ---
 
