@@ -68,7 +68,9 @@ RUN git clone --depth 1 --branch "v${MOODLE_VERSION}" \
         https://github.com/moodle/moodle.git /opt/moodle-dist \
     && actual="$(git -C /opt/moodle-dist rev-parse HEAD)" \
     && if [ "$actual" != "${MOODLE_COMMIT}" ]; then \
-          echo "commit mismatch: got $actual, expected ${MOODLE_COMMIT}" >&2; \
+          echo "commit mismatch: v${MOODLE_VERSION} is $actual, but MOODLE_COMMIT pins ${MOODLE_COMMIT}." >&2; \
+          echo "MOODLE_VERSION (from .env or --build-arg) names another release than the pin." >&2; \
+          echo "Set it to the release in docker/moodle/Dockerfile, or move both pins (README: Update Version and Commit Pin)." >&2; \
           exit 1; \
        fi \
     && rm -rf /opt/moodle-dist/.git \
