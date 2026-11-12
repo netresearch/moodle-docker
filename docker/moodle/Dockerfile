@@ -60,8 +60,8 @@ RUN --mount=type=bind,from=ghcr.io/php/pie:1.5.2-bin@sha256:a254c78b51ca34daef05
 # version.php names a first release by its branch alone: v5.3.0 carries
 # release '5.3 (Build: ...)', v5.3.1 carries '5.3.1 (Build: ...)'. Hence the
 # trailing ".0" is stripped before the release string is compared.
-ARG MOODLE_VERSION=5.3.0
-ARG MOODLE_COMMIT=42622298fe06f9626d988d60b2bf589bd8f850e8
+ARG MOODLE_VERSION=5.3.1
+ARG MOODLE_COMMIT=cfe123f26fc7071981fe949cb16cd5a08a8234f1
 ENV MOODLE_VERSION=${MOODLE_VERSION}
 
 RUN git clone --depth 1 --branch "v${MOODLE_VERSION}" \

@@ -89,7 +89,7 @@ To upgrade to a new Moodle version:
 
 1. Edit `.env` and change `MOODLE_VERSION`:
    ```env
-   MOODLE_VERSION=5.3.1
+   MOODLE_VERSION=5.3.2
    ```
 
 2. Rebuild the image and restart the stack. The sources ship inside the image,

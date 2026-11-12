@@ -140,7 +140,7 @@ All configuration is done via environment variables in `.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MOODLE_VERSION` | `5.3.0` | Moodle version baked into the image; changing it needs a rebuild |
+| `MOODLE_VERSION` | `5.3.1` | Moodle version baked into the image; changing it needs a rebuild |
 | `MOODLE_URL` | `http://localhost` | Full URL to your Moodle site (no trailing slash) |
 | `SSL_PROXY` | `false` | Set to `true` behind an SSL-terminating proxy; sets `$CFG->sslproxy` |
 | `REVERSE_PROXY` | `false` | Sets `$CFG->reverseproxy` for advanced load balancing or port forwarding; leave off for a plain TLS terminator |
@@ -198,7 +198,7 @@ The build pins the upstream commit, so a version bump needs both values. Resolve
 the tag and cross-check it against Moodle's own release metadata:
 
 Replace `<version>` below with the release you are moving to, for example
-`5.3.1` once it is published:
+`5.3.2` once it is published:
 
 ```bash
 # Commit the tag points at
