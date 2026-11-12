@@ -1,15 +1,13 @@
-# Moodle 5.3 Docker Stack
+# Moodle Docker Stack
 
 [![Docker Build](https://github.com/netresearch/moodle-docker/actions/workflows/docker-build.yml/badge.svg)](https://github.com/netresearch/moodle-docker/actions/workflows/docker-build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Moodle](https://img.shields.io/badge/Moodle-5.3-orange.svg)](https://moodle.org/)
-[![PHP](https://img.shields.io/badge/PHP-8.4-blue.svg)](https://www.php.net/)
-[![nginx](https://img.shields.io/badge/nginx-1.31-green.svg)](https://nginx.org/)
-[![MariaDB](https://img.shields.io/badge/MariaDB-12.3%20hardened-blue.svg)](https://mariadb.org/)
-[![Valkey](https://img.shields.io/badge/Valkey-9-red.svg)](https://valkey.io/)
 
-Production-ready Docker Compose stack for Moodle 5.3 LMS with PHP 8.4 (PHP-FPM),
-nginx 1.31, MariaDB 12.3 (Docker Hardened Image), and Valkey 9.
+Production-ready Docker Compose stack for the Moodle LMS with PHP-FPM, nginx,
+MariaDB (Docker Hardened Image) and Valkey.
+
+Versions are not repeated in this README. Each one is pinned in one place, listed
+under [Components](#components), and Renovate keeps those pins current.
 
 ## Key Features
 
@@ -27,11 +25,11 @@ nginx 1.31, MariaDB 12.3 (Docker Hardened Image), and Valkey 9.
 
 ```
                               ┌─────────────────────────────────────────────────┐
-                              │           Moodle 5.3 Docker Stack               │
+                              │             Moodle Docker Stack                 │
                               ├─────────────────────────────────────────────────┤
                               │                                                 │
         HTTP/HTTPS/QUIC       │  ┌────────────────────────────────────────┐    │
-      ───────────────────────►│  │           nginx 1.31                   │    │
+      ───────────────────────►│  │           nginx                        │    │
         (80/443)              │  │   HTTP/2 + HTTP/3 + Brotli             │    │
                               │  │   Static files, SSL termination        │    │
                               │  └──────────────────┬─────────────────────┘    │
@@ -39,13 +37,13 @@ nginx 1.31, MariaDB 12.3 (Docker Hardened Image), and Valkey 9.
                               │                     │ FastCGI (port 9000)       │
                               │                     ▼                           │
                               │  ┌──────────────────────────────────────────┐  │
-                              │  │              PHP 8.4 FPM                 │  │
+                              │  │              PHP-FPM                     │  │
                               │  │   Moodle App (baked into the image)     │  │
                               │  │   OPcache + JIT + Redis extension       │  │
                               │  └──────┬───────────────────────┬──────────┘  │
                               │         │                       │              │
                               │  ┌──────┴──────┐         ┌──────┴──────┐      │
-                              │  │ MariaDB 12.3│         │  Valkey 9   │      │
+                              │  │   MariaDB   │         │   Valkey    │      │
                               │  │  Database   │         │  Sessions   │      │
                               │  │             │         │  + Cache    │      │
                               │  └─────────────┘         └─────────────┘      │
@@ -63,18 +61,20 @@ nginx 1.31, MariaDB 12.3 (Docker Hardened Image), and Valkey 9.
 
 ## Components
 
-| Component | Version | Description |
-|-----------|---------|-------------|
-| **nginx** | 1.31 | Web server with HTTP/2, HTTP/3 (QUIC), Brotli compression |
-| **PHP-FPM** | 8.4 | PHP runtime with OPcache JIT, Redis, igbinary, APCu |
-| **MariaDB** | 12.3 (hardened) | Docker Hardened Image, runs non-root (uid 65532) |
-| **Valkey** | 9 | Redis-compatible server for sessions and cache |
-| **Ofelia** | 1.0.0 (netresearch) | Docker-native cron scheduler for Moodle tasks |
-| **Mailpit** | v1.31.1 | Development mail catcher (optional, `dev` profile) |
+| Component | Version pinned in | Description |
+|-----------|-------------------|-------------|
+| **Moodle** | `docker/moodle/Dockerfile` (`MOODLE_VERSION`, `MOODLE_COMMIT`) | LMS sources, baked into the image |
+| **nginx** | `docker/nginx/Dockerfile` | Web server with HTTP/2, HTTP/3 (QUIC), Brotli compression |
+| **PHP-FPM** | `docker/moodle/Dockerfile` | PHP runtime with OPcache JIT, Redis, igbinary, APCu; held to the PHP versions the Moodle release supports |
+| **MariaDB** | `compose.yml` | Docker Hardened Image, runs non-root (uid 65532) |
+| **Valkey** | `compose.yml` | Redis-compatible server for sessions and cache |
+| **Ofelia** | `compose.yml` | Docker-native cron scheduler for Moodle tasks, limited to the jobs of this stack |
+| **Mailpit** | `compose.yml` | Development mail catcher (optional, `dev` profile) |
 
 ## Prerequisites
 
-- Docker Engine 24.0+
+- Docker Compose 5.3.0 or later: the `moodle` service creates the database
+  through a `pre_start` hook, which older Compose releases do not know
 - Access to `dhi.io` for the hardened MariaDB image (`docker login dhi.io`)
 - 4GB+ RAM (8GB+ recommended for production)
 - 20GB+ disk space
@@ -140,7 +140,7 @@ All configuration is done via environment variables in `.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MOODLE_VERSION` | `5.3.1` | Moodle version baked into the image; changing it needs a rebuild |
+| `MOODLE_VERSION` | the release in `docker/moodle/Dockerfile` | Moodle version baked into the image; changing it needs a rebuild |
 | `MOODLE_URL` | `http://localhost` | Full URL to your Moodle site (no trailing slash) |
 | `SSL_PROXY` | `false` | Set to `true` behind an SSL-terminating proxy; sets `$CFG->sslproxy` |
 | `REVERSE_PROXY` | `false` | Sets `$CFG->reverseproxy` for advanced load balancing or port forwarding; leave off for a plain TLS terminator |
@@ -152,7 +152,7 @@ All configuration is done via environment variables in `.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DB_TYPE` | `mariadb` | Database type (`mariadb` or `pgsql`). The stack ships MariaDB only; an external PostgreSQL must be 17 or later for Moodle 5.3 |
+| `DB_TYPE` | `mariadb` | Database type (`mariadb` or `pgsql`). The stack ships MariaDB only; an external PostgreSQL must meet the minimum the Moodle release sets in `public/admin/environment.xml` |
 | `DB_HOST` | `database` | Database hostname |
 | `DB_NAME` | `moodle` | Database name |
 | `DB_USER` | `moodle` | Database user |
@@ -197,8 +197,9 @@ image is built from the matching Git tag at https://github.com/moodle/moodle/tag
 The build pins the upstream commit, so a version bump needs both values. Resolve
 the tag and cross-check it against Moodle's own release metadata:
 
-Replace `<version>` below with the release you are moving to, for example
-`5.3.2` once it is published:
+Replace `<version>` below with the release you are moving to, `<branch>` with
+its major and minor version (`5.3` for any 5.3.x), and `<installed>` with the
+`$version` value from `public/version.php` of the release you are coming from:
 
 ```bash
 # Commit the tag points at
@@ -209,7 +210,7 @@ git ls-remote https://github.com/moodle/moodle.git "refs/tags/v<version>^{}"
 # release you are coming FROM - the API answers with what is newer than that.
 # The metadata names a first release without ".0" ("5.4", not "5.4.0"), and
 # norelease_index_info carries the weekly build, not the release.
-curl -s "https://download.moodle.org/api/1.3/updates.php?version=2026100500&branch=5.3&format=json" \
+curl -s "https://download.moodle.org/api/1.3/updates.php?version=<installed>&branch=<branch>&format=json" \
   | jq -r '.updates.core[].release_index_info | select(.version == "<version>") | .githash'
 ```
 
@@ -365,7 +366,7 @@ Moodle image with your own web server and have not added the rewrite.
 moodle-docker/
 ├── docker/
 │   ├── moodle/
-│   │   ├── Dockerfile          # PHP 8.4 FPM image
+│   │   ├── Dockerfile          # PHP-FPM image
 │   │   └── entrypoint.sh       # Moodle download & config generation
 │   ├── nginx/
 │   │   ├── Dockerfile          # nginx with Brotli modules

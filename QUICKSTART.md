@@ -1,4 +1,4 @@
-# Moodle 5.3 Quick Start
+# Moodle Quick Start
 
 Get Moodle running in under 5 minutes.
 
@@ -6,8 +6,8 @@ Get Moodle running in under 5 minutes.
 
 ## Prerequisites
 
-- **Docker** 20.10.15 or later
-- **Docker Compose** v2.5.0 or later
+- **Docker** with **Docker Compose** 5.3.0 or later (the stack uses a
+  `pre_start` hook to create the database)
 
 ```bash
 # Verify installation
@@ -89,7 +89,7 @@ To upgrade to a new Moodle version:
 
 1. Edit `.env` and change `MOODLE_VERSION`:
    ```env
-   MOODLE_VERSION=5.3.2
+   MOODLE_VERSION=<version>
    ```
 
 2. Set `ARG MOODLE_VERSION` and `ARG MOODLE_COMMIT` in
@@ -132,7 +132,7 @@ docker compose down -v
 |----------|-------------------|---------------------|
 | nginx    | Web server        | http://localhost    |
 | moodle   | PHP-FPM app       | (internal)          |
-| database | MariaDB 11.8      | (internal)          |
+| database | MariaDB           | (internal)          |
 | valkey   | Cache & sessions  | (internal)          |
 | ofelia   | Cron scheduler    | (internal)          |
 | mailpit  | Mail catcher (dev)| http://localhost/mailpit/ |
