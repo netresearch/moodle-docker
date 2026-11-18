@@ -3,6 +3,9 @@
 
 FROM nginx:1.31-alpine AS builder
 
+# Both stages resolve the same base. Reject stale images before compiling modules.
+RUN apk info --installed 'nginx>=1.31.9' >/dev/null
+
 # Install build dependencies
 RUN apk add --no-cache \
     git \
