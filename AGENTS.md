@@ -69,7 +69,9 @@ file behind them (`/lib/exampleshimroute2.php`) and that location wins over
 `location /` for them. Change the flag and all three locations together, then
 run `admin/cli/checks.php` as described above: its router check requests five
 URLs, routed paths and two shims among them, through `$CFG->wwwroot`, so it
-needs the resolvable `wwwroot` too.
+needs the resolvable `wwwroot` too. None of those five URLs ends in a static
+file extension, so the check passes with the static-file fallback broken;
+request a routed `.js` path as well, as the CI step below does.
 
 **A file extension does not mean a file.** Since 5.3 Moodle serves its ES
 modules through the router under `.js` paths (`/core/esm/<rev>/bootstrap/bootstrap.js`),
@@ -94,14 +96,17 @@ they connect from their own containers. Without `-h` the client uses the
 local socket, and `MYSQL_PWD` keeps the password off the command line:
 
 ```bash
-docker compose exec -T database sh -c \
+(umask 077 && docker compose exec -T database sh -c \
   'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" exec mariadb-dump -u root --single-transaction --quick --default-character-set=utf8mb4 "$1"' \
-  _ moodle > moodle.sql
-tail -n 1 moodle.sql   # must read "-- Dump completed on ..."
+  _ moodle > moodle.sql.part)
+tail -n 1 moodle.sql.part   # must read "-- Dump completed on ..."
+mv moodle.sql.part moodle.sql   # only after that line checked out
 ```
 
-Replace `moodle` with `DB_NAME` from `.env` if you changed it. Keep stderr
-visible and check the last line: with `2>/dev/null` this failure once left a
+Replace `moodle` with `DB_NAME` from `.env` if you changed it. The dump holds
+user data, hence `umask 077`; writing to `moodle.sql.part` first keeps an
+earlier `moodle.sql` intact when the dump fails. Keep stderr visible and check
+the last line: with `2>/dev/null` this failure once left a
 20-byte compressed dump that `gzip -t` accepted, because an empty gzip stream
 is valid.
 
