@@ -135,7 +135,7 @@ services:
   # creates neither database nor user - the pre_start hook on moodle does that.
   # ==========================================================================
   database:
-    image: dhi.io/mariadb:12.3
+    image: dhi.io/mariadb:13.0
     container_name: ${COMPOSE_PROJECT_NAME:-moodle}_database
     restart: unless-stopped
     volumes:
