@@ -20,7 +20,7 @@ ARG RUNTIME_DEPS="bash curl git unzip \
 
 # Install dependencies and PHP extensions; the PECL ones with PIE from Packagist,
 # since pecl.php.net is deprecated and its downloads fail
-RUN --mount=type=bind,from=ghcr.io/php/pie:1.5.5-bin@sha256:3fca03c16df842d02b654dc382db3756058d9c128064f57cace14f8728779ce9,source=/pie,target=/usr/local/bin/pie \
+RUN --mount=type=bind,from=ghcr.io/php/pie:1.6.1-bin@sha256:2ca18ec63249ff2d8b9936afeea88ab2e9225041980c16b7ad99ce0fccb014a6,source=/pie,target=/usr/local/bin/pie \
     apk add --no-cache $RUNTIME_DEPS $BUILD_DEPS \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-configure ldap \
